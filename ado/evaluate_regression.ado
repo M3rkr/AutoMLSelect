@@ -5,17 +5,27 @@ program define evaluate_regression
     // =========================================================================
     //
     // Description:
-    // Evaluates the performance of a regression model by calculating RMSE, R-squared,
-    // MAE, and MAPE.
+    // Evaluates a regression model by calculating performance metrics.
     //
     // Syntax:
-    // evaluate_regression target(varname) prediction(varname) [options]
+    // evaluate_regression, ///
+    //     target(target_variable) ///
+    //     prediction(predicted_variable) ///
+    //     [ metrics(metric_list) ///
+    //       save_metrics(string) ]
     //
     // Options:
-    //   save_metrics(filename) - Save the calculated metrics to a CSV file
+    //   target(varname)        - Actual target variable.
+    //   prediction(varname)    - Predicted target variable.
+    //   metrics(metric_list)   - List of metrics to calculate (RMSE, R-squared, MAE, MAPE).
+    //   save_metrics(string)    - File path to save the calculated metrics as CSV.
     //
     // Example:
-    // . evaluate_regression target(Income) prediction(Income_pred) save_metrics(reg_metrics.csv)
+    // evaluate_regression, ///
+    //     target(Price) ///
+    //     prediction(Price_pred_linear_regression) ///
+    //     metrics(R-squared RMSE MAE MAPE) ///
+    //     save_metrics("linear_regression_metrics.csv")
     //
     // =========================================================================
 
@@ -23,128 +33,73 @@ program define evaluate_regression
     syntax , ///
         target(string) ///
         prediction(string) ///
-        [ save_metrics(string) ]
+        [ metrics(string) ///
+          save_metrics(string) ]
 
     // -------------------------------------------------------------------------
-    // 1. Validate Inputs
+    // 1. Calculate Metrics
     // -------------------------------------------------------------------------
-    if "`target'" == "" {
-        display as error "Error: Target variable is not specified."
-        exit 198
-    }
+    display "Calculating Regression Metrics..."
+    qui su `prediction', meanonly
+    local mean_pred = r(mean)
 
-    if "`prediction'" == "" {
-        display as error "Error: Prediction variable is not specified."
-        exit 198
-    }
-
-    // Check if target variable exists and is numeric
-    cap confirm variable `target'
-    if _rc != 0 {
-        display as error "Error: Target variable `target' does not exist in the dataset."
-        exit 198
-    }
-
-    qui describe `target'
-    if r(type) != "float" & r(type) != "double" & r(type) != "long" & r(type) != "int" & r(type) != "byte" {
-        display as error "Error: Target variable `target' must be numeric for regression evaluation."
-        exit 198
-    }
-
-    // Check if prediction variable exists and is numeric
-    cap confirm variable `prediction'
-    if _rc != 0 {
-        display as error "Error: Prediction variable `prediction' does not exist in the dataset."
-        exit 198
-    }
-
-    qui describe `prediction'
-    if r(type) != "float" & r(type) != "double" & r(type) != "long" & r(type) != "int" & r(type) != "byte" {
-        display as error "Error: Prediction variable `prediction' must be numeric for regression evaluation."
-        exit 198
-    }
-
-    // Check for missing values in target or prediction
-    qui count if missing(`target') | missing(`prediction')
-    if r(N) > 0 {
-        display as error "Error: There are missing values in the target or prediction variables. Please handle them before evaluation."
-        exit 198
-    }
-
-    // -------------------------------------------------------------------------
-    // 2. Calculate Performance Metrics
-    // -------------------------------------------------------------------------
-    display "Calculating regression performance metrics..."
-
-    // Calculate Residuals
-    generate double residual = `target' - `prediction'
+    qui su `target' `prediction', meanonly
+    local mean_actual = r(mean)
 
     // Calculate RMSE
-    summarize residual, meanonly
-    local rmse = sqrt(r(mean)^2 + r(sd)^2) // Alternatively, sqrt(r(mean^2 + r(sd)^2))
-    // A more accurate RMSE calculation:
-    qui su residual^2, meanonly
+    generate double _error = `target' - `prediction'
+    qui su _error^2, meanonly
     local rmse = sqrt(r(mean))
 
     // Calculate MAE
-    generate double abs_residual = abs(residual)
-    summarize abs_residual, meanonly
+    generate double _abs_error = abs(`target' - `prediction')
+    qui su _abs_error, meanonly
     local mae = r(mean)
-    drop abs_residual
-
-    // Calculate MAPE
-    generate double ape = abs_residual / abs(`target')
-    summarize ape, meanonly
-    local mape = r(mean) * 100
-    drop ape
 
     // Calculate R-squared
-    qui regress `target' `prediction'
-    local rsq = e(r2)
+    qui reg `target' `prediction'
+    local rsquared = e(r2)
 
-    // Clean up residual variable
-    drop residual
+    // Calculate MAPE
+    qui su `target', meanonly
+    generate double _ape = abs((_error) / r(mean)) * 100
+    qui su _ape, meanonly
+    local mape = r(mean)
+
+    // Create a dataset of metrics
+    clear
+    input str15 metric double value
+    "RMSE"        `rmse'
+    "R-squared"   `rsquared'
+    "MAE"         `mae'
+    "MAPE"        `mape'
+    end
 
     // -------------------------------------------------------------------------
-    // 3. Display Metrics
+    // 2. Display Metrics
     // -------------------------------------------------------------------------
     display as text "----------------------------------------"
-    display as text "Regression Performance Metrics:"
+    display as text "Regression Model Performance Metrics:"
     display as text "----------------------------------------"
-    display as result "RMSE: " %9.4f `rmse'
-    display as result "R-squared: " %9.4f `rsq'
-    display as result "MAE: " %9.4f `mae'
-    display as result "MAPE: " %9.4f `mape' "%"
+    list, clean noobs
     display as text "----------------------------------------"
 
     // -------------------------------------------------------------------------
-    // 4. Save Metrics to CSV if Specified
+    // 3. Save Metrics to CSV
     // -------------------------------------------------------------------------
     if "`save_metrics'" != "" {
-        // Create a temporary dataset to store metrics
-        tempname metrics
-        qui {
-            postfile `metrics' str20 metric_name double metric_value using temp_metrics.dta, replace
-            post `metrics' "RMSE" (`rmse')
-            post `metrics' "R-squared" (`rsq')
-            post `metrics' "MAE" (`mae')
-            post `metrics' "MAPE" (`mape')
-            postclose `metrics'
+        export delimited using "`save_metrics'", replace
+        if _rc == 0 {
+            display "Regression metrics saved to '`save_metrics''."
         }
-
-        // Export the metrics to CSV
-        qui {
-            use temp_metrics.dta, clear
-            export delimited using "`save_metrics'", replace
-            drop _all
+        else {
+            display as error "Error: Failed to save regression metrics to '`save_metrics''."
         }
-
-        display "Performance metrics saved to '`save_metrics''."
     }
 
     // -------------------------------------------------------------------------
-    // 5. End of Program
+    // 4. Cleanup
     // -------------------------------------------------------------------------
-    display "Regression evaluation completed successfully."
+    drop _error _abs_error
 
 end

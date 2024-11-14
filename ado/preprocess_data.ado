@@ -1,171 +1,155 @@
-*! version 1.0
+*! version 2.1
 program define preprocess_data
     // =========================================================================
     // preprocess_data.ado
     // =========================================================================
     //
     // Description:
-    // This function imports a CSV file, handles missing values by imputing
-    // with the mean for numeric variables and the mode for categorical variables,
-    // and encodes categorical variables using one-hot encoding (dummy variables).
+    // Preprocesses the dataset by handling missing values, encoding categorical
+    // variables, and performing other preprocessing steps as specified by the user.
     //
     // Syntax:
-    // preprocess_data using "data.csv"
+    // preprocess_data using "data.dta", ///
+    //     target(target_variable) ///
+    //     predictors(varlist) ///
+    //     [ handle_missing(mean|median|mode) ///
+    //       encode_onehot ///
+    //       scale_variables ]
+    //
+    // Options:
+    //   handle_missing(method) - Method to handle missing values: mean, median, or mode.
+    //   encode_onehot          - Perform one-hot encoding on categorical variables.
+    //   scale_variables        - Standardize or normalize numeric variables.
     //
     // Example:
-    // . preprocess_data using "sample_data.csv"
+    // preprocess_data using "data.dta", ///
+    //     target(Price) ///
+    //     predictors(Size Bedrooms Age Location) ///
+    //     handle_missing(mean mode) ///
+    //     encode_onehot
     //
     // =========================================================================
 
     version 16.0
-    syntax using/ [if] [in], ///
-        // No additional options for simplicity; can be extended as needed
+    syntax using/ , ///
+        target(string) ///
+        predictors(string) ///
+        [ handle_missing(string) ///
+          encode_onehot ///
+          scale_variables ]
 
     // -------------------------------------------------------------------------
-    // 1. Check if the input file exists
+    // 1. Load Data
     // -------------------------------------------------------------------------
-    local filepath "`using'"
-
-    if "`filepath'" == "" {
-        display as error "Error: No input file specified."
-        exit 198
-    }
-
-    if !fileexists("`filepath'") {
-        display as error "Error: The file `filepath' does not exist."
-        exit 198
-    }
+    display "Loading data from `using'..."
+    use "`using'", clear
 
     // -------------------------------------------------------------------------
-    // 2. Import the CSV file
+    // 2. Handle Missing Values
     // -------------------------------------------------------------------------
-    display "Importing data from `filepath'..."
-    import delimited using "`filepath'", clear varnames(1) encoding(UTF8)
-    
-    // -------------------------------------------------------------------------
-    // 3. Identify Variable Types
-    //    - Categorical Variables: String variables
-    //    - Numeric Variables: Numeric variables
-    // -------------------------------------------------------------------------
-    display "Identifying variable types..."
-
-    // Identify string variables (categorical)
-    ds, has(type string)
-    local categorical_vars `r(varlist)'
-
-    // Identify numeric variables
-    ds, has(type numeric)
-    local numeric_vars `r(varlist)'
-
-    // Display identified variables
-    display "Categorical Variables: `categorical_vars'"
-    display "Numeric Variables: `numeric_vars'"
-
-    // -------------------------------------------------------------------------
-    // 4. Handle Missing Values for Numeric Variables
-    // -------------------------------------------------------------------------
-    if "`numeric_vars'" != "" {
-        display "Handling missing values for numeric variables by imputing with mean..."
-
-        foreach var of varlist `numeric_vars' {
-            // Calculate mean excluding missing values
-            quietly summarize `var', meanonly
-            local mean = r(mean)
-
-            // Check if the variable has any missing values
-            qui count if missing(`var')
-            if r(N) > 0 {
-                // Replace missing values with mean
-                replace `var' = `mean' if missing(`var')
-                display "Imputed missing values in numeric variable `var' with mean (`mean')."
-            }
-            else {
-                display "No missing values found in numeric variable `var'."
-            }
+    if "`handle_missing'" != "" {
+        display "Handling missing values using `handle_missing' method(s)..."
+        tokenize "`handle_missing'"
+        local methods_list
+        while "`1'" != "" {
+            local methods_list `methods_list' `1'
+            macro shift
         }
-    }
-    else {
-        display "No numeric variables found to impute."
-    }
 
-    // -------------------------------------------------------------------------
-    // 5. Handle Missing Values for Categorical Variables
-    // -------------------------------------------------------------------------
-    if "`categorical_vars'" != "" {
-        display "Handling missing values for categorical variables by imputing with mode..."
-
-        foreach var of varlist `categorical_vars' {
-            // Check if the variable has any missing values
-            qui count if missing(`var')
-            if r(N) > 0 {
-                // Calculate mode (most frequent category)
-                qui tabulate `var', missing nofreq
-                // Extract the mode using r(max)
-                qui egen mode_`var' = mode(`var')
-
-                // Retrieve the mode value
-                local mode = mode_`var'[1]
-
-                // Replace missing values with mode
-                replace `var' = "`mode'" if missing(`var')
-                drop mode_`var'
-
-                display "Imputed missing values in categorical variable `var' with mode (`mode')."
-            }
-            else {
-                display "No missing values found in categorical variable `var'."
-            }
-        }
-    }
-    else {
-        display "No categorical variables found to impute."
-    }
-
-    // -------------------------------------------------------------------------
-    // 6. One-Hot Encode Categorical Variables
-    // -------------------------------------------------------------------------
-    if "`categorical_vars'" != "" {
-        display "Encoding categorical variables using one-hot encoding..."
-
-        foreach var of varlist `categorical_vars' {
-            display "Encoding variable `var'..."
-
-            // Get the unique levels of the categorical variable
-            qui levelsof `var', local(levels)
-
-            // Loop through each level to create dummy variables
-            foreach lvl of local levels {
-                // Clean the level name to create a valid variable name
-                local lvl_clean = subinstr("`lvl'", " ", "_", .)  // Replace spaces with underscores
-                local lvl_clean = subinstr("`lvl_clean'", "-", "_", .) // Replace hyphens with underscores
-                local lvl_clean = lower("`lvl_clean'") // Convert to lowercase
-
-                // Define the dummy variable name
-                local dummy = "`var'_`lvl_clean'"
-
-                // Check if the dummy variable already exists to avoid duplication
-                cap confirm variable `dummy'
-                if _rc == 0 {
-                    display "Dummy variable `dummy' already exists. Skipping creation."
-                }
-                else {
-                    // Generate the dummy variable
-                    generate byte `dummy' = (`var' == "`lvl'") if !missing(`var')
-                    replace `dummy' = 0 if missing(`dummy')
-                    label variable `dummy' "Dummy for `var' == `lvl'"
-                    display "Created dummy variable `dummy'."
+        foreach method of local methods_list {
+            if "`method'" == "mean" {
+                foreach var of varlist `predictors' {
+                    // Check if variable is numeric
+                    quietly describe `var'
+                    if inlist(r(type), "float", "double", "byte", "int", "long") {
+                        quietly summarize `var', meanonly
+                        replace `var' = r(mean) if missing(`var')
+                    }
+                    else {
+                        display as warning "Variable `var' is not numeric. Skipping 'mean' imputation."
+                    }
                 }
             }
-
-            // Optionally, drop the original categorical variable after encoding
-            // Uncomment the following line if you wish to drop the original variable
-            // drop `var'
+            else if "`method'" == "median" {
+                foreach var of varlist `predictors' {
+                    // Check if variable is numeric
+                    quietly describe `var'
+                    if inlist(r(type), "float", "double", "byte", "int", "long") {
+                        quietly centile `var', centile(50) nodrop
+                        replace `var' = r(c_1) if missing(`var')
+                    }
+                    else {
+                        display as warning "Variable `var' is not numeric. Skipping 'median' imputation."
+                    }
+                }
+            }
+            else if "`method'" == "mode" {
+                foreach var of varlist `predictors' {
+                    // Mode can be applied to both numeric and string variables
+                    quietly tabulate `var', missing
+                    if r(N) > 0 {
+                        local mode_val = r(max)
+                        replace `var' = "`mode_val'" if missing(`var')
+                    }
+                    else {
+                        display as warning "Cannot determine mode for variable `var'."
+                    }
+                }
+            }
+            else {
+                display as error "Invalid missing value handling method: `method'"
+                exit 198
+            }
         }
     }
-    else {
-        display "No categorical variables found to encode."
+
+    // -------------------------------------------------------------------------
+    // 3. Encode Categorical Variables
+    // -------------------------------------------------------------------------
+    if "`encode_onehot'" != "" {
+        display "Performing one-hot encoding on categorical variables..."
+        foreach var of varlist `predictors' {
+            // Check if the variable is string (categorical)
+            quietly describe `var'
+            if inlist(r(type), "str1", "str2", "str3", "str4", "str5", "str6", "str7", "str8", "str9", "str10", ///
+                      "str11", "str12", "str13", "str14", "str15", "str16", "str17", "str18", "str19", "str20") {
+                encode `var', gen(`var'_encoded) replace
+                quietly tabulate `var'_encoded, generate(`var'_dummy)
+                drop `var'_encoded
+                drop `var'
+                // Rename dummy variables appropriately
+                foreach dummy_var of varlist `var'_dummy* {
+                    local new_name = "`var'_`=substr("`dummy_var'", strpos("`dummy_var'", "_dummy") + 6, .)"
+                    rename `dummy_var' `new_name'
+                }
+            }
+        }
     }
 
-    display "Preprocessing completed successfully."
+    // -------------------------------------------------------------------------
+    // 4. Scale Variables
+    // -------------------------------------------------------------------------
+    if "`scale_variables'" != "" {
+        display "Scaling numeric variables..."
+        foreach var of varlist `predictors' {
+            // Check if variable is numeric
+            quietly describe `var'
+            if inlist(r(type), "float", "double", "byte", "int", "long") {
+                quietly summarize `var', meanonly
+                generate double `var'_scaled = (`var' - r(mean)) / r(sd)
+                drop `var'
+                rename `var'_scaled `var'
+            }
+            else {
+                display as warning "Variable `var' is not numeric. Skipping scaling."
+            }
+        }
+    }
 
+    // -------------------------------------------------------------------------
+    // 5. Save Preprocessed Data
+    // -------------------------------------------------------------------------
+    tempfile preprocessed_data
+    save "`preprocessed_data'", replace
+    display "Data preprocessing completed. Preprocessed data saved."
 end

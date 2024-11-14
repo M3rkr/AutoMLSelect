@@ -6,193 +6,95 @@ program define train_random_forest
     //
     // Description:
     // Trains a Random Forest model using the specified target and predictor variables.
-    // Utilizes the user-contributed 'randomforest' package.
-    // Stores the model estimates for later evaluation or selection.
+    // Supports both regression and classification tasks based on the target variable.
     //
     // Syntax:
-    // train_random_forest target(varname) predictors(varlist) [options]
+    // train_random_forest, ///
+    //     target(target_variable) ///
+    //     predictors(varlist) ///
+    //     [ trees(integer) ///
+    //       mtry(integer) ]
     //
     // Options:
-    //   trees(#)    - Number of trees to grow (default: 500)
-    //   mtry(#)     - Number of variables to possibly split at in each node (default: sqrt(#predictors))
-    //   save(name)  - Save the model results with a specified name
+    //   target(varname)      - Target variable for the Random Forest model.
+    //   predictors(varlist)  - Predictor variables for the Random Forest model.
+    //   trees(integer)       - Number of trees to grow in the forest. Default is 500.
+    //   mtry(integer)        - Number of variables randomly sampled as candidates at each split. Default is square root of number of predictors for classification and one-third for regression.
     //
     // Example:
-    // . train_random_forest target(Purchase) predictors(Age Gender Income Region) trees(1000) mtry(3) save(rf_purchase)
+    // train_random_forest, ///
+    //     target(Purchase) ///
+    //     predictors(Age Gender_income Income) ///
+    //     trees(1000) ///
+    //     mtry(3)
     //
     // =========================================================================
 
     version 16.0
-    syntax, ///
+    syntax , ///
         target(string) ///
-        predictors(varlist) ///
-        [ trees(integer 500) mtry(integer) save(string) ]
+        predictors(string) ///
+        [ trees(integer) ///
+          mtry(integer) ]
 
     // -------------------------------------------------------------------------
-    // 1. Validate Inputs
+    // 1. Set Defaults for Optional Parameters
     // -------------------------------------------------------------------------
-    if "`target'" == "" {
-        display as error "Error: Target variable is not specified."
-        exit 198
-    }
-
-    if "`predictors'" == "" {
-        display as error "Error: Predictor variables are not specified."
-        exit 198
-    }
-
-    // Check if target variable exists
-    cap confirm variable `target'
-    if _rc != 0 {
-        display as error "Error: Target variable `target' does not exist in the dataset."
-        exit 198
-    }
-
-    // Check if predictor variables exist
-    foreach var of varlist `predictors' {
-        cap confirm variable `var'
-        if _rc != 0 {
-            display as error "Error: Predictor variable `var' does not exist in the dataset."
-            exit 198
-        }
-    }
-
-    // Determine if the problem is classification or regression based on target variable
-    qui describe `target'
-    if r(type) == "string" {
-        local problem "classification"
-    }
-    else if r(type) == "float" | r(type) == "double" | r(type) == "long" | r(type) == "int" | r(type) == "byte" {
-        // Check if target variable is binary for classification
-        qui tabulate `target', missing
-        if r(r) == 2 {
-            local problem "classification"
-        }
-        else {
-            local problem "regression"
-        }
-    }
-    else {
-        display as error "Error: Unsupported target variable type."
-        exit 198
-    }
-
-    // -------------------------------------------------------------------------
-    // 2. Check and Install 'randomforest' Package if Necessary
-    // -------------------------------------------------------------------------
-    capture which randomforest
-    if _rc != 0 {
-        display "The 'randomforest' package is not installed. Attempting to install..."
-        ssc install randomforest, replace
-        if _rc != 0 {
-            display as error "Error: Failed to install the 'randomforest' package. Please install it manually."
-            exit 198
-        }
-        else {
-            display "Successfully installed the 'randomforest' package."
-        }
-    }
-    else {
-        display "The 'randomforest' package is already installed."
-    }
-
-    // -------------------------------------------------------------------------
-    // 3. Set Default Parameters if Not Specified
-    // -------------------------------------------------------------------------
-    // Number of trees
     if "`trees'" == "" {
-        local trees 500
-    }
-    else {
-        local trees `trees'
+        local trees = 500
     }
 
-    // Number of variables to possibly split at in each node
     if "`mtry'" == "" {
-        local num_predictors : word count `predictors'
-        local mtry = ceil(sqrt(`num_predictors'))
-    }
-    else {
-        local mtry `mtry'
-    }
-
-    // -------------------------------------------------------------------------
-    // 4. Train Random Forest Model
-    // -------------------------------------------------------------------------
-    display "Training Random Forest model..."
-    display "Number of trees: `trees'"
-    display "Number of variables tried at each split (mtry): `mtry'"
-
-    // Set seed for reproducibility
-    set seed 12345
-
-    // Train the Random Forest model
-    qui {
-        if "`problem'" == "classification" {
-            randomforest `target' `predictors', ///
-                trees(`trees') ///
-                mtry(`mtry') ///
-                classification ///
-                importance ///
-                keep
-        }
-        else if "`problem'" == "regression" {
-            randomforest `target' `predictors', ///
-                trees(`trees') ///
-                mtry(`mtry') ///
-                regression ///
-                importance ///
-                keep
-        }
-    }
-
-    display "Random Forest model trained successfully."
-
-    // -------------------------------------------------------------------------
-    // 5. Save the Model Results if Specified
-    // -------------------------------------------------------------------------
-    if "`save'" != "" {
-        // Save the random forest model results
-        // Note: The 'randomforest' package does not have a built-in save function.
-        // Therefore, we save the entire dataset with model predictions.
-
-        // Generate predictions
-        predict double rf_predicted if e(sample), ///
-            pr(`target')  // For classification, predicted probabilities
-
-        // Save the predictions and model details
-        save "`save'.dta", replace
-
-        if _rc == 0 {
-            display "Random Forest model predictions saved as '`save'.dta'."
+        // Calculate default mtry based on task
+        // If target is binary, assume classification; else regression
+        qui count if `target' == 0 | `target' == 1
+        if _rc == 0 & r(N) > 0 {
+            local mtry = ceil(sqrt(`: word count `predictors''))
         }
         else {
-            display as error "Error: Failed to save model predictions."
+            local mtry = ceil(`: word count `predictors'` / 3)
         }
     }
 
     // -------------------------------------------------------------------------
-    // 6. Store the Model (if possible)
+    // 2. Determine Task Type
     // -------------------------------------------------------------------------
-    // Since 'randomforest' does not integrate with Stata's 'estimates' system,
-    // we can store relevant information manually or utilize user-contributed methods.
-
-    // For demonstration, we will store basic model information
-    tempname rf_info
-    qui {
-        postfile `rf_info' str20 model_type int trees float mtry using rf_model_info, replace
-        post `rf_info' ("Random_Forest") (`trees') (`mtry')
-        postclose `rf_info'
+    // Assume classification if target is binary; else regression
+    qui tabulate `target', missing
+    if r(rng_min) == 0 & r(rng_max) == 1 & r(rng_min) != r(rng_max) {
+        local task "classification"
+    }
+    else {
+        local task "regression"
     }
 
-    // Append to estimates
-    append using rf_model_info.dta, force
-
-    display "Random Forest model information stored."
+    display "Training Random Forest Model for `task'..."
+    
+    // -------------------------------------------------------------------------
+    // 3. Train Random Forest Model
+    // -------------------------------------------------------------------------
+    if "`task'" == "classification" {
+        randomforest `target' `predictors', ///
+            trees(`trees') ///
+            mtry(`mtry') ///
+            classification
+    }
+    else if "`task'" == "regression" {
+        randomforest `target' `predictors', ///
+            trees(`trees') ///
+            mtry(`mtry') ///
+            regression
+    }
+    else {
+        display as error "Unsupported task type for Random Forest: `task'"
+        exit 198
+    }
 
     // -------------------------------------------------------------------------
-    // 7. End of Program
+    // 4. Save Model Estimates
     // -------------------------------------------------------------------------
-    display "Training completed successfully."
+    local model_name "random_forest_`task'"
+    estimates store `model_name'
+    display "Random Forest (`task') Model trained and estimates stored as `model_name'."
 
 end
