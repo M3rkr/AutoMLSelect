@@ -1,0 +1,151 @@
+/***********************************************************************
+ *                                                                     *
+ *                  A U T O M A L S E L E C T   P A C K A G E         *
+ *                                                                     *
+ *                       A U T O M L S E L E C T _ T R A I N          *
+ *                                                                     *
+ ***********************************************************************/
+
+/*! version 1.0
+    -------------------------------------------------------------------------
+    NAME
+        automlselect_train - Train Multiple Machine Learning Models
+
+    SYNOPSIS
+        automlselect_train, ///
+            target(varname) ///
+            predictors(varlist) ///
+            models(model_list) ///
+            [ options ]
+
+    DESCRIPTION
+        The `automlselect_train` command is a core component of the **AutoMLSelect**
+        package, designed to facilitate the training of multiple machine learning
+        models in an automated and streamlined manner. It leverages user-specified
+        models and training options to fit models to the provided dataset, storing
+        the resulting estimates for subsequent evaluation and selection.
+
+        **Key Functionalities:**
+        - **Model Training:** Supports training of various models including Linear
+          Regression, Logistic Regression, and Random Forests.
+        - **Customization:** Allows users to specify training options such as robust
+          standard errors, number of trees for Random Forests, and more.
+        - **Model Storage:** Saves trained model estimates for later evaluation and
+          comparison.
+
+    OPTIONS
+        target(varname)
+            Specifies the target (dependent) variable for model training. This variable
+            is the outcome that the models will aim to predict.
+
+        predictors(varlist)
+            Lists the predictor (independent) variables to be used in model training.
+            These variables serve as the inputs for the machine learning models.
+
+        models(model_list)
+            Defines the list of models to train. Multiple models can be specified by
+            separating them with spaces. Supported models include:
+                - `linear_regression`       : Train a Linear Regression model.
+                - `logistic_regression`     : Train a Logistic Regression model.
+                - `random_forest`           : Train a Random Forest model.
+
+        robust
+            (Optional) When specified, the command will train models using robust standard
+            errors where applicable. For example, Linear and Logistic Regression models
+            will utilize robust variance estimates if this option is included.
+
+        trees(integer)
+            (Optional) Applicable only to the `random_forest` model. Specifies the number
+            of trees to grow in the Random Forest. Default is 500 if not specified.
+
+        mtry(integer)
+            (Optional) Applicable only to the `random_forest` model. Defines the number
+            of variables to possibly split at in each node. If not specified, defaults to
+            the ceiling of the square root of the number of predictor variables.
+
+        save(string)
+            (Optional) Specifies a base name for saving the trained models' estimates.
+            If provided, each model's estimates will be saved with this base name appended
+            by the model type (e.g., `save(model_name)` results in `model_name_linear_regression.ster`).
+
+    EXAMPLES
+
+        1. **Training Linear and Logistic Regression Models with Robust Standard Errors**
+
+            Suppose you have a dataset `marketing_data.dta` with the target variable `Sales`
+            and predictor variables `Advertising`, `Price`, and `Competition`. You want to
+            train both Linear Regression and Logistic Regression models using robust standard
+            errors.
+
+            ```stata
+            . automlselect_train, ///
+                  target(Sales) ///
+                  predictors(Advertising Price Competition) ///
+                  models(linear_regression logistic_regression) ///
+                  robust
+            ```
+
+            **Explanation:**
+            - **Models Trained:** Linear Regression and Logistic Regression.
+            - **Options:** Uses robust standard errors for both models.
+            - **Outcome:** Models are trained and their estimates are stored internally for evaluation.
+
+        2. **Training a Random Forest Model with Custom Number of Trees and Saving Estimates**
+
+            Consider a dataset `customer_data.dta` with the target variable `Churn` (binary)
+            and predictors `Age`, `Gender`, `Income`, and `Subscription_Length`. You aim to
+            train a Random Forest model with 1000 trees and save the model estimates.
+
+            ```stata
+            . automlselect_train, ///
+                  target(Churn) ///
+                  predictors(Age Gender Income Subscription_Length) ///
+                  models(random_forest) ///
+                  trees(1000) ///
+                  save(rf_churn_model)
+            ```
+
+            **Explanation:**
+            - **Model Trained:** Random Forest.
+            - **Options:** Specifies 1000 trees for the Random Forest.
+            - **Saving Estimates:** Model estimates are saved as `rf_churn_model_random_forest.ster`.
+            - **Outcome:** The Random Forest model is trained with the specified parameters and saved for future use.
+
+        3. **Training Multiple Models with Mixed Options**
+
+            You can train multiple models simultaneously, each with its specific options. For example, training both Linear Regression and Random Forest models, where the Random Forest has a custom number of trees.
+
+            ```stata
+            . automlselect_train, ///
+                  target(Income) ///
+                  predictors(Age Education Experience) ///
+                  models(linear_regression random_forest) ///
+                  robust ///
+                  trees(800) ///
+                  save(lr_rf_income_model)
+            ```
+
+            **Explanation:**
+            - **Models Trained:** Linear Regression (with robust standard errors) and Random Forest (with 800 trees).
+            - **Saving Estimates:** Models are saved as `lr_rf_income_model_linear_regression.ster` and `lr_rf_income_model_random_forest.ster`.
+            - **Outcome:** Both models are trained with their respective options and saved for evaluation.
+
+    NOTES
+        - **Model Dependencies:** Ensure that any user-contributed packages required by specific models (e.g., `randomforest` for Random Forest models) are installed prior to training. The `automlselect_train` command will attempt to install missing packages automatically but may require user intervention if installation fails.
+        
+        - **Data Requirements:** The dataset must be preprocessed appropriately before training models. This includes handling missing values, encoding categorical variables, and ensuring that the target and predictor variables are in the correct format.
+
+        - **Model Storage:** Trained models are stored using Stata's `estimates` system where applicable. For models that do not integrate with `estimates` (e.g., Random Forest), model details are saved in `.dta` files if the `save` option is used.
+
+        - **Robust Standard Errors:** The `robust` option applies to models that support robust variance estimates. It is ignored for models that do not support this feature.
+
+        - **Random Forest Parameters:** If the `trees` or `mtry` options are not specified for Random Forest models, default values are used (500 trees and ceiling of the square root of the number of predictors, respectively).
+
+    AUTHOR
+        Developed by [Your Name or Organization], 2024.
+
+    VERSION
+        1.0
+
+    SEE ALSO
+        automlselect, automlselect_preprocess, automlselect_evaluate, automlselect_select, train_linear_regression, train_logistic_regression, train_random_forest
