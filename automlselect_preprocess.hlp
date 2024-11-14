@@ -1,0 +1,63 @@
+-------------------------------------------------------------------------------
+help for preprocess_data
+-------------------------------------------------------------------------------
+
+Title
+-----
+    preprocess_data - Preprocess a dataset by handling missing values and encoding categorical variables.
+
+Version
+-------
+    preprocess_data v1.0
+
+Syntax
+------
+    preprocess_data using "filename.csv"
+
+Description
+-----------
+    `preprocess_data` is a Stata program that preprocesses a dataset by:
+    - Importing a CSV file.
+    - Handling missing values:
+        - Imputing mean for numeric variables.
+        - Imputing mode for categorical variables.
+    - Encoding categorical variables using one-hot encoding (dummy variables).
+
+    This helps prepare the data for further analysis or machine learning model training.
+
+Options
+-------
+    *No options are required or available for this version.*
+
+Details
+-------
+    - **Importing Data**: The CSV file specified must be provided in the `using` clause.
+    - **Missing Value Handling**:
+        - **Numeric Variables**: Missing values are imputed with the mean of the variable.
+        - **Categorical Variables**: Missing values are imputed with the mode (most frequent value) of the variable.
+    - **One-Hot Encoding**: Converts categorical variables into dummy variables for each unique category.
+
+Example
+-------
+    . preprocess_data using "sample_data.csv"
+
+    This command imports `sample_data.csv`, imputes missing values, and encodes categorical variables.
+
+Output
+------
+    - Lists numeric and categorical variables identified in the dataset.
+    - Displays messages indicating how missing values are handled and whether dummy variables are created.
+    - Reports on the completion of the preprocessing process.
+
+Warnings
+--------
+    - Ensure the input CSV file is correctly formatted and accessible.
+    - Original categorical variables are retained by default. Uncomment the `drop` line in the code if you wish to remove them after encoding.
+
+Author
+------
+    Developed by [Your Name], [Date].
+
+See Also
+--------
+    [D] import delimited, [R] summarize, [FN] generate, [D] label variable
