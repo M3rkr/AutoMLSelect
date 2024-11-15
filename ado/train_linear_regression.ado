@@ -11,21 +11,21 @@ program define train_linear_regression
     // train_linear_regression, ///
     //     target(target_variable) ///
     //     predictors(varlist) ///
-    //     robust ///
+    //     [ robust ] ///
     //     save(filename)
     //
     // Options:
     //   target(string)         - The target variable for regression.
     //   predictors(varlist)    - Predictor variables.
     //   robust                 - Use robust standard errors.
-    //   save(string)           - Filename to save the trained model.
+    //   save(string)           - Filename to save the trained model estimates (.ster).
     //
     // Example:
     // train_linear_regression, ///
     //     target(Price) ///
     //     predictors(Size Bedrooms Age Location_east Location_north Location_south Location_west) ///
     //     robust ///
-    //     save("models/linear_regression_model.dta")
+    //     save("linear_regression_model.ster")
     //
     // =========================================================================
     
@@ -36,20 +36,36 @@ program define train_linear_regression
         [ robust ///
           save(string) ]
     
-    // Train Linear Regression Model
-    display "Training Linear Regression Model..."
-    regress `target' `predictors', robust
-    
-    if _rc {
-        display as error "Linear Regression training failed."
+    // Check if target and predictors are specified
+    if ("`target'" == "" | "`predictors'" == "") {
+        display as error "train_linear_regression: Both 'target' and 'predictors' must be specified."
         exit 198
     }
     
-    // Save the model
-    if "`save'" != "" {
-        estimates store lr_model
-        save "`save'", replace
+    // Train Linear Regression Model
+    if ("`robust'" != "") {
+        regress `target' `predictors', robust
+    }
+    else {
+        regress `target' `predictors'
     }
     
-    display "Linear Regression model trained and saved to `save'."
+    if (_rc != 0) {
+        display as error "train_linear_regression: Linear Regression training failed."
+        exit 198
+    }
+    
+    // Save the model estimates
+    if ("`save'" != "") {
+        estimates store lr_model
+        estimates save "`save'", replace
+        if (_rc != 0) {
+            display as error "train_linear_regression: Failed to save model estimates."
+            exit 198
+        }
+        display "Linear Regression model trained and saved to `save'."
+    }
+    else {
+        display as warning "train_linear_regression: No save path provided. Model estimates not saved."
+    }
 end

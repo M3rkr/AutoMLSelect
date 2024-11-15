@@ -1,4 +1,5 @@
-* generate_sample_datasets.do
+*! version 2.3
+* generate_sample_datasets.do 
 * ============================
 * Generates sample datasets for AutoMLSelect Package
 * Author: [Your Name]
@@ -7,6 +8,23 @@
 
 clear all
 set more off
+
+*-----------------------------------------------------------
+* Define Base Directory
+*-----------------------------------------------------------
+* Replace the path below with your actual package directory
+local base_path "D:/AutoMLSelect"
+
+*-----------------------------------------------------------
+* Create Necessary Directories
+*-----------------------------------------------------------
+display "Creating necessary directories..."
+cap mkdir "`base_path'/models"
+cap mkdir "`base_path'/metrics"
+cap mkdir "`base_path'/data"
+cap mkdir "`base_path'/ado"
+cap mkdir "`base_path'/do-files"
+display "Directories are set up."
 
 *-----------------------------------------------------------
 * Generate Sample Regression Dataset
@@ -48,8 +66,14 @@ generate double Price = 50000 + 150 * Size + 10000 * Bedrooms - 200 * Age + ///
     round(rnormal(0, 10000), 1)
 
 * Save the regression dataset
-save "data/sample_regression_data.dta", replace
-display "sample_regression_data.dta generated successfully."
+save "`base_path'/data/sample_regression_data.dta", replace
+if (_rc == 0) {
+    display "sample_regression_data.dta generated successfully."
+}
+else {
+    display as error "Failed to save sample_regression_data.dta."
+    exit 198
+}
 
 *-----------------------------------------------------------
 * Generate Sample Classification Dataset
@@ -94,8 +118,14 @@ replace Purchase = 1 in 1/30
 replace Purchase = 0 in 31/100
 
 * Save the classification dataset
-save "data/sample_classification_data.dta", replace
-display "sample_classification_data.dta generated successfully."
+save "`base_path'/data/sample_classification_data.dta", replace
+if (_rc == 0) {
+    display "sample_classification_data.dta generated successfully."
+}
+else {
+    display as error "Failed to save sample_classification_data.dta."
+    exit 198
+}
 
 *-----------------------------------------------------------
 * Completion Message

@@ -10,11 +10,11 @@ program define evaluate_models
     // Syntax:
     // evaluate_models, ///
     //     target(target_variable) ///
-    //     save_metrics(filename)
+    //     save_metrics(metrics_filename)
     //
     // Options:
     //   target(string)        - The target variable.
-    //   save_metrics(string)  - Filename to save the evaluation metrics.
+    //   save_metrics(string)  - Filename to save the evaluation metrics (.csv).
     //
     // Example:
     // evaluate_models, ///
@@ -22,35 +22,53 @@ program define evaluate_models
     //     save_metrics("metrics/regression_metrics.csv")
     //
     // =========================================================================
-    
+
     version 16.0
     syntax , ///
         target(string) ///
         save_metrics(string)
+
+    // Validate options
+    if ("`target'" == "") {
+        display as error "evaluate_models: 'target' must be specified."
+        exit 198
+    }
     
+    if ("`save_metrics'" == "") {
+        display as error "evaluate_models: 'save_metrics' must be specified."
+        exit 198
+    }
+
     // Initialize metrics storage
     tempfile metrics_file
     postfile handle str25 model double(RMSE R_squared MAE MAPE Accuracy Precision Recall F1_Score AUC) using `metrics_file', replace
-    
-    // List all trained models
-    local model_files : dir models/ files "*.dta"
-    
+
+    // List all trained model estimate files (*.ster)
+    local model_files : dir models/ files "*.ster"
+
+    if ("`model_files'" == "") {
+        display as error "evaluate_models: No model estimate files (*.ster) found in 'models/' directory."
+        exit 198
+    }
+
     foreach model_file of local model_files {
         display "Evaluating `model_file'..."
         
         // Determine model type based on filename
-        if strpos("`model_file'", "linear_regression") {
+        if (strpos("`model_file'", "linear_regression") > 0) {
             // Regression Model: Linear Regression
             use "data/sample_regression_data.dta", clear
-            predict double pred_lr, xb
+            estimates use "models/`model_file'", preserve
+            predict double prediction_var, xb
             // Evaluate
+            local metrics_path = "metrics/temp_lr_metrics.csv"
             evaluate_regression, ///
-                target(Price) ///
-                prediction(pred_lr) ///
-                save_metrics("metrics/temp_lr_metrics.csv")
+                target("Price") ///
+                prediction("prediction_var") ///
+                save_metrics("`metrics_path'")
             
             // Load metrics
-            import delimited using "metrics/temp_lr_metrics.csv", clear
+            import delimited using "`metrics_path'", clear
             local RMSE = value[1]
             local R_squared = value[2]
             local MAE = value[3]
@@ -59,63 +77,22 @@ program define evaluate_models
             // Post metrics
             post handle ("`model_file'") (`RMSE') (`R_squared') (`MAE') (`MAPE') (.) (.) (.) (.) (.)
         }
-        else if strpos("`model_file'", "random_forest_regression") {
-            // Regression Model: Random Forest Regression
-            use "data/sample_regression_data.dta", clear
-            predict double pred_rf_lr, xb
-            // Evaluate
-            evaluate_regression, ///
-                target(Price) ///
-                prediction(pred_rf_lr) ///
-                save_metrics("metrics/temp_rf_lr_metrics.csv")
-            
-            // Load metrics
-            import delimited using "metrics/temp_rf_lr_metrics.csv", clear
-            local RMSE = value[1]
-            local R_squared = value[2]
-            local MAE = value[3]
-            local MAPE = value[4]
-            
-            // Post metrics
-            post handle ("`model_file'") (`RMSE') (`R_squared') (`MAE') (`MAPE') (.) (.) (.) (.) (.)
-        }
-        else if strpos("`model_file'", "logistic_regression") {
+        else if (strpos("`model_file'", "logistic_regression") > 0) {
             // Classification Model: Logistic Regression
             use "data/sample_classification_data.dta", clear
-            predict double prob_lr, pr
-            predict byte pred_class_lr
+            estimates use "models/`model_file'", preserve
+            predict double probability_var, pr
+            generate byte prediction_var = (probability_var >= 0.5)
             // Evaluate
+            local metrics_path = "metrics/temp_class_metrics.csv"
             evaluate_classification, ///
-                target(Purchase) ///
-                prediction(pred_class_lr) ///
-                probability(prob_lr) ///
-                save_metrics("metrics/temp_lr_class_metrics.csv")
+                target("Purchase") ///
+                prediction("prediction_var") ///
+                probability("probability_var") ///
+                save_metrics("`metrics_path'")
             
             // Load metrics
-            import delimited using "metrics/temp_lr_class_metrics.csv", clear
-            local Accuracy = value[1]
-            local Precision = value[2]
-            local Recall = value[3]
-            local F1_Score = value[4]
-            local AUC = value[5]
-            
-            // Post metrics
-            post handle ("`model_file'") (.) (.) (.) (`Accuracy') (`Precision') (`Recall') (`F1_Score') (`AUC')
-        }
-        else if strpos("`model_file'", "random_forest_classification") {
-            // Classification Model: Random Forest Classification
-            use "data/sample_classification_data.dta", clear
-            predict double prob_rf_class, pr
-            predict byte pred_class_rf_class
-            // Evaluate
-            evaluate_classification, ///
-                target(Purchase) ///
-                prediction(pred_class_rf_class) ///
-                probability(prob_rf_class) ///
-                save_metrics("metrics/temp_rf_class_metrics.csv")
-            
-            // Load metrics
-            import delimited using "metrics/temp_rf_class_metrics.csv", clear
+            import delimited using "`metrics_path'", clear
             local Accuracy = value[1]
             local Precision = value[2]
             local Recall = value[3]
@@ -126,16 +103,16 @@ program define evaluate_models
             post handle ("`model_file'") (.) (.) (.) (`Accuracy') (`Precision') (`Recall') (`F1_Score') (`AUC')
         }
         else {
-            display as warning "Unknown model type for `model_file'. Skipping evaluation."
+            display as warning "evaluate_models: Unknown model type for '`model_file''. Skipping evaluation."
         }
     }
-    
+
     // Close postfile
     postclose handle
-    
+
     // Export metrics
     use `metrics_file', clear
     export delimited using "`save_metrics'", replace
-    
-    display "All models evaluated. Metrics saved to `save_metrics'."
+
+    display "All models evaluated. Metrics saved to '`save_metrics'."
 end
