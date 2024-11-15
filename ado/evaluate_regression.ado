@@ -1,4 +1,4 @@
-*! version 2.3
+*! version 2.4
 program define evaluate_regression
     // =========================================================================
     // evaluate_regression.ado
@@ -49,29 +49,30 @@ program define evaluate_regression
 
     // Calculate Metrics
     quietly {
+        // Residuals and absolute residuals
         gen double residual = `target' - `prediction'
         gen double abs_residual = abs(residual)
-        summarize residual, meanonly
-        scalar mean_residual = r(mean)
-        scalar var_residual = r(Var)
-        scalar MAE = sum(abs_residual) / _N
+        
+        // Mean Absolute Error (MAE)
+        summarize abs_residual, meanonly
+        scalar MAE = r(mean)
 
-        // Calculate RMSE
-        scalar RMSE = sqrt(sum(residual^2) / _N)
+        // Root Mean Squared Error (RMSE)
+        summarize residual^2, meanonly
+        scalar RMSE = sqrt(r(mean))
 
-        // Attempt to calculate R-squared if available
+        // R-squared (if possible)
+        scalar R_squared = .
         capture {
-            // For linear regression, R-squared is available after regress
+            regress `target' `prediction'
             scalar R_squared = e(r2)
         }
 
-        // Calculate MAPE
-        capture {
-            gen double abs_residual_pct = abs(residual) / abs(`target')
-            replace abs_residual_pct = . if `target' == 0
-            summarize abs_residual_pct, meanonly
-            scalar MAPE = r(mean) * 100
-        }
+        // Mean Absolute Percentage Error (MAPE)
+        gen double abs_residual_pct = abs(residual) / abs(`target')
+        replace abs_residual_pct = . if `target' == 0  // Handle divide-by-zero cases
+        summarize abs_residual_pct, meanonly
+        scalar MAPE = r(mean) * 100
     }
 
     // Prepare to save metrics
@@ -80,19 +81,19 @@ program define evaluate_regression
     post handle ("RMSE") (RMSE)
     post handle ("MAE") (MAE)
 
-    // If R-squared exists and is not missing, include it
-    if (c(rc) == 0 & !missing(R_squared)) {
+    // Include R-squared if calculable
+    if (!missing(R_squared)) {
         post handle ("R-squared") (R_squared)
     }
 
-    // If MAPE is calculable and not missing, include it
-    if (c(rc) == 0 & !missing(MAPE)) {
+    // Include MAPE if calculable
+    if (!missing(MAPE)) {
         post handle ("MAPE") (MAPE)
     }
 
     postclose handle
 
-    // Save metrics to specified path
+    // Save metrics to the specified path
     use `metrics_temp', clear
     export delimited using "`save_metrics'", replace
 

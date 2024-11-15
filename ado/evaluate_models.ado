@@ -19,7 +19,7 @@ program define evaluate_models
     // Example:
     // evaluate_models, ///
     //     target(Price) ///
-    //     save_metrics("metrics/regression_metrics.csv")
+    //     save_metrics("metrics/evaluation_metrics.csv")
     //
     // =========================================================================
 
@@ -41,7 +41,7 @@ program define evaluate_models
 
     // Initialize metrics storage
     tempfile metrics_file
-    postfile handle str25 model double(RMSE R_squared MAE MAPE Accuracy Precision Recall F1_Score AUC) using `metrics_file', replace
+    postfile handle str25 model double RMSE R_squared MAE MAPE Accuracy Precision Recall F1_Score AUC using `metrics_file', replace
 
     // List all trained model estimate files (*.ster)
     local model_files : dir models/ files "*.ster"
@@ -56,42 +56,40 @@ program define evaluate_models
         
         // Determine model type based on filename
         if (strpos("`model_file'", "linear_regression") > 0) {
-            // Regression Model: Linear Regression
+            // Linear Regression Evaluation
             use "data/sample_regression_data.dta", clear
-            estimates use "models/`model_file'", preserve
+            estimates use "models/`model_file'", restore
             predict double prediction_var, xb
-            // Evaluate
             local metrics_path = "metrics/temp_lr_metrics.csv"
             evaluate_regression, ///
-                target("Price") ///
+                target("`target'") ///
                 prediction("prediction_var") ///
                 save_metrics("`metrics_path'")
             
-            // Load metrics
+            // Load regression metrics
             import delimited using "`metrics_path'", clear
             local RMSE = value[1]
             local R_squared = value[2]
             local MAE = value[3]
             local MAPE = value[4]
             
-            // Post metrics
+            // Post regression metrics
             post handle ("`model_file'") (`RMSE') (`R_squared') (`MAE') (`MAPE') (.) (.) (.) (.) (.)
         }
         else if (strpos("`model_file'", "logistic_regression") > 0) {
-            // Classification Model: Logistic Regression
+            // Logistic Regression Evaluation
             use "data/sample_classification_data.dta", clear
-            estimates use "models/`model_file'", preserve
+            estimates use "models/`model_file'", restore
             predict double probability_var, pr
             generate byte prediction_var = (probability_var >= 0.5)
-            // Evaluate
             local metrics_path = "metrics/temp_class_metrics.csv"
             evaluate_classification, ///
-                target("Purchase") ///
+                target("`target'") ///
                 prediction("prediction_var") ///
                 probability("probability_var") ///
                 save_metrics("`metrics_path'")
             
-            // Load metrics
+            // Load classification metrics
             import delimited using "`metrics_path'", clear
             local Accuracy = value[1]
             local Precision = value[2]
@@ -99,8 +97,8 @@ program define evaluate_models
             local F1_Score = value[4]
             local AUC = value[5]
             
-            // Post metrics
-            post handle ("`model_file'") (.) (.) (.) (`Accuracy') (`Precision') (`Recall') (`F1_Score') (`AUC')
+            // Post classification metrics
+            post handle ("`model_file'") (.) (.) (.) (.) (`Accuracy') (`Precision') (`Recall') (`F1_Score') (`AUC')
         }
         else {
             display as warning "evaluate_models: Unknown model type for '`model_file''. Skipping evaluation."

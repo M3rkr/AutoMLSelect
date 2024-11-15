@@ -5,8 +5,8 @@ program define automlselect
     // =========================================================================
     //
     // Description:
-    // Main entry point for the AutoMLSelect package. Facilitates training and evaluation
-    // of Linear and Logistic Regression models for regression and classification tasks.
+    // Main entry point for the AutoMLSelect package. Facilitates training, evaluation,
+    // and selection of the best model for regression and classification tasks.
     //
     // Syntax:
     // automlselect [regression|classification], ///
@@ -22,19 +22,6 @@ program define automlselect
     //   save_model(string)         - Filename to save the trained model estimates (.ster).
     //   save_metrics(string)       - Filename to save the evaluation metrics (.csv).
     //
-    // Example:
-    // automlselect regression, ///
-    //     target(Price) ///
-    //     predictors("Size Bedrooms Age Location_east Location_north Location_south Location_west") ///
-    //     save_model("linear_regression_model.ster") ///
-    //     save_metrics("regression_metrics.csv")
-    //
-    // automlselect classification, ///
-    //     target(Purchase) ///
-    //     predictors("Age Gender_female Gender_male Income Region_east Region_north Region_south Region_west") ///
-    //     save_model("logistic_regression_model.ster") ///
-    //     save_metrics("classification_metrics.csv")
-    //
     // =========================================================================
     
     version 16.0
@@ -46,22 +33,22 @@ program define automlselect
 
     // Validate task specification
     if ("`regression'" != "" & "`classification'" != "") {
-        display as error "automlselect: Please specify either 'regression' or 'classification', not both."
+        display as error "automlselect: Specify either 'regression' or 'classification', not both."
         exit 198
     }
 
     if ("`regression'" == "" & "`classification'" == "") {
-        display as error "automlselect: Please specify the task type: 'regression' or 'classification'."
+        display as error "automlselect: Specify the task type: 'regression' or 'classification'."
         exit 198
     }
 
     if ("`target'" == "") {
-        display as error "automlselect: Please specify the target variable using the 'target()' option."
+        display as error "automlselect: Specify the target variable using the 'target()' option."
         exit 198
     }
 
     if ("`predictors'" == "") {
-        display as error "automlselect: Please specify predictor variables using the 'predictors()' option."
+        display as error "automlselect: Specify predictor variables using the 'predictors()' option."
         exit 198
     }
 
@@ -82,7 +69,7 @@ program define automlselect
         local save_metrics = "`task'_metrics.csv"
     }
 
-    // Train Linear or Logistic Regression
+    // Train the model
     if ("`task'" == "regression") {
         display "Training Linear Regression Model..."
         train_linear_regression, ///
@@ -100,16 +87,25 @@ program define automlselect
             save("models/`save_model'")
     }
 
-    // Evaluate Models
+    // Evaluate the trained model
     display "Evaluating Trained Models..."
-    evaluate_models, ///
-        target("`target'") ///
-        save_metrics("metrics/`save_metrics'")
+    if ("`task'" == "regression") {
+        evaluate_regression, ///
+            target("`target'") ///
+            prediction("`save_model'") ///
+            save_metrics("metrics/`save_metrics'")
+    }
+    else if ("`task'" == "classification") {
+        evaluate_classification, ///
+            target("`target'") ///
+            prediction("`save_model'") ///
+            save_metrics("metrics/`save_metrics'")
+    }
 
-    // Select Best Model based on Metrics
+    // Select the best model based on metrics
     display "Selecting Best Model based on Metrics..."
     if ("`task'" == "regression") {
-        // Example: Select model with lowest RMSE
+        // Select model with the lowest RMSE
         select_best_model, ///
             using("metrics/`save_metrics'") ///
             task(regression) ///
@@ -118,7 +114,7 @@ program define automlselect
             save_results("metrics/best_regression_model.csv")
     }
     else if ("`task'" == "classification") {
-        // Example: Select model with highest AUC
+        // Select model with the highest AUC
         select_best_model, ///
             using("metrics/`save_metrics'") ///
             task(classification) ///
