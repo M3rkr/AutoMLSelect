@@ -1,339 +1,192 @@
 # AutoMLSelect
 
-**AutoMLSelect** is a comprehensive Stata package designed to simplify the process of training, evaluating, and selecting machine learning models for both regression and classification tasks. By providing streamlined commands and functions, AutoMLSelect enables users to efficiently perform automated machine learning without delving deep into the intricacies of model tuning and evaluation.
+## Description
 
-## Table of Contents
-
-1. [Features](#features)
-2. [Installation](#installation)
-3. [Usage](#usage)
-   - [1. Preparing Your Data](#1-preparing-your-data)
-   - [2. Running AutoMLSelect](#2-running-automlselect)
-   - [3. Model Training and Evaluation](#3-model-training-and-evaluation)
-4. [Examples](#examples)
-5. [Testing](#testing)
-6. [Troubleshooting](#troubleshooting)
-7. [Contributing](#contributing)
-8. [License](#license)
-
----
+AutoMLSelect is a Stata package designed to automate the selection and execution of regression and classification models based on user-defined parameters. It streamlines the modeling process by handling data import, preprocessing, model training, evaluation, and output generation, making it easier for users to identify the best-performing models without extensive manual intervention.
 
 ## Features
 
-- **Model Training:** Train various regression and classification models with ease.
-- **Random Forest Integration:** Incorporate Random Forest models alongside traditional regression and classification models.
-- **Evaluation Metrics:** Automatically calculate and save relevant evaluation metrics.
-- **Model Selection:** Select the best-performing model based on user-specified metrics.
-- **Robust Error Handling:** Provides informative error messages to guide users.
-- **Comprehensive Testing:** Includes unit tests to ensure package reliability.
+- Automated data import from CSV, Excel, or Stata (.dta) formats.
+- Handles missing values by imputing numerical variables with their mean and categorical variables with their mode.
+- Supports both regression (Linear Regression, Box-Cox Regression) and classification (Logistic Regression, Linear Regression for Classification) tasks.
+- Automatically selects the best-performing model based on relevant performance metrics (e.g., R² for regression, Accuracy for classification).
+- Generates comprehensive outputs, including predictions, model coefficients, and evaluation metrics.
+- Provides a user-friendly help file with detailed documentation and example usage.
 
 ## Installation
 
-1. **Clone the Repository:**
+Follow these steps to install the AutoMLSelect package in Stata:
+
+1. **Download the Package Files**
    
-   ```bash
-   git clone https://github.com/yourusername/AutoMLSelect.git
-   ```
-2. **Set Up Ado-Files:**
+   - Ensure you have the following directory structure:
+     
+     ```
+     AutoMLSelect/
+     ├── ado/
+     │   └── automlselect.ado
+     ├── help/
+     │   └── automlselect.sthlp
+     └── examples/
+         └── example_usage.do
+     ```
+2. **Place Files Appropriately**
    
-   - Place all ado-files within the `ado/AutoMLSelect/` directory in Stata's personal ado-path.
+   - Move `automlselect.ado` to the `ado/` folder.
+   - Move `automlselect.sthlp` to the `help/` folder.
+   - (Optional) Place `example_usage.do` in the `examples/` folder for reference.
+3. **Update Stata’s ADO Path**
    
-   **Example Directory Structure:**
-   
-   ```
-   C:\Users\YourName\ado\personal\AutoMLSelect\
-   ```
-3. **Install Dependencies:**
-   
-   **Random Forest Functionality:**
-   
-   AutoMLSelect now utilizes the [`rforest`](https://www.stata-journal.com/software/sj20-1/rforest/) package for Random Forest models. Install it using:
-   
-   ```stata
-   ssc install rforest
-   ```
-   
-   **Manual Installation (if needed):**
-   
-   If `ssc install rforest` does not work, follow these steps:
-   
-   1. **Download the Package:**
-      
-      - Visit the [Stata Journal](http://www.stata-journal.com/software/sj20-1/rforest/) to download the `rforest` package files.
-   2. **Extract the Files:**
-      
-      - Extract the contents of the ZIP file to a temporary directory on your computer.
-   3. **Locate Your Personal Ado-Path:**
-      
-      - In Stata, run:
-        
-        ```stata
-        adopath
-        ```
-      - Identify your personal ado-directory (usually something like `C:\Users\YourName\ado\personal\`).
-   4. **Move the Files:**
-      
-      - Copy the extracted `.ado` and `.hlp` files into the `personal` ado-directory identified earlier.
-   5. **Verify Installation:**
-      
-      - In Stata, run:
-        
-        ```stata
-        which rforest
-        ```
-      - Stata should display the path to the `rforest.ado` file, confirming a successful installation.
-4. **Verify Installation:**
-   
-   Open Stata and run:
+   If the package directory is not already in Stata's ADO path, add it using the following commands:
    
    ```stata
-   which automlselect
+   sysdir set PLUS "path_to_AutoMLSelect/ado" 
+   sysdir set HELP "path_to_AutoMLSelect/help"
    ```
    
-   If installed correctly, Stata will display the path to the `automlselect.ado` file.
+   *Replace `path_to_AutoMLSelect` with the actual path to your AutoMLSelect directory.*
+4. **Verify Installation**
+   
+   Open Stata and type `help automlselect` to ensure the help file is accessible.
 
 ## Usage
 
-### 1. Preparing Your Data
+Use the `automlselect` command to perform automated model selection and evaluation. Below are the syntax and examples tailored to your sample datasets.
 
-**Important:** Before utilizing **AutoMLSelect**, ensure that your dataset is **clean** and **properly formatted**. This includes:
-
-- **Handling Missing Values:** Remove or impute missing data as appropriate.
-- **Encoding Categorical Variables:** Convert categorical variables to a suitable format (e.g., one-hot encoding).
-- **Scaling Numerical Variables:** Standardize or normalize numerical features if necessary.
-
-**Note:** AutoMLSelect **assumes that the data provided is already clean**. Preprocessing steps must be performed manually or using your preferred methods.
-
-### 2. Running AutoMLSelect
-
-Once your data is prepared, you can proceed to train and evaluate models.
-
-#### **Regression Example: Linear and Random Forest Regression**
+### Syntax
 
 ```stata
-use "data/sample_regression_data.dta", clear
-
-automlselect regression, ///
-    target(Price) ///
-    predictors(Size Bedrooms Age Location_east Location_north Location_south Location_west) ///
-    num_trees(200) ///
-    mtry(3) ///
-    max_depth(10) ///
-    save_model("models/regression_model") ///
-    save_metrics("metrics/regression_metrics.csv")
+automlselect using(filepath), ///
+    numcols("numerical_columns") ///
+    catcols("categorical_columns") ///
+    target("target_variable") ///
+    task("regression" | "classification") ///
+    outpath("output_directory")
 ```
 
-**Explanation:**
+### Parameters
 
-- **Task Type:** `regression`
-- **Target Variable:** `Price`
-- **Predictors:** `Size Bedrooms Age Location_east Location_north Location_south Location_west`
-- **Random Forest Parameters:**
-  - **`num_trees`**: 200 trees
-  - **`mtry`**: 3 variables sampled at each split
-  - **`max_depth`**: Maximum tree depth of 10
-- **Outputs:**
-  - **Trained Models:** Saved in `models/` directory with appropriate filenames.
-  - **Evaluation Metrics:** Saved in `metrics/regression_metrics.csv`
+- **using(filepath)**: Path to the dataset file. Supported formats include CSV, Excel (.xlsx, .xls), and Stata (.dta).
+- **numcols(string)**: Comma-separated list of numerical columns to include in the model.
+- **catcols(string)**: Comma-separated list of categorical columns to include in the model.
+- **target(string)**: The dependent variable to predict.
+- **task(string)**: Type of analysis to perform. Options are `"regression"` or `"classification"`.
+- **outpath(string)**: Directory path where output files will be saved. The directory will be created if it does not exist.
 
-#### **Classification Example: Logistic and Random Forest Classification**
+**Command:**
 
 ```stata
-use "data/sample_classification_data.dta", clear
-
-automlselect classification, ///
-    target(Purchase) ///
-    predictors(Age Gender_female Gender_male Income Region_east Region_north Region_south Region_west) ///
-    num_trees(200) ///
-    mtry(4) ///
-    max_depth(10) ///
-    save_model("models/classification_model") ///
-    save_metrics("metrics/classification_metrics.csv")
+automlselect using("data/sample_classification_data.dta"), ///
+    numcols("Age,Income") ///
+    catcols("Gender,Region") ///
+    target("Purchase") ///
+    task("classification") ///
+    outpath("results/classification")
 ```
 
-**Explanation:**
+**Expected Outputs in `results/classification/`:
 
-- **Task Type:** `classification`
-- **Target Variable:** `Purchase`
-- **Predictors:** `Age Gender_female Gender_male Income Region_east Region_north Region_south Region_west`
-- **Random Forest Parameters:**
-  - **`num_trees`**: 200 trees
-  - **`mtry`**: 4 variables sampled at each split
-  - **`max_depth`**: Maximum tree depth of 10
-- **Outputs:**
-  - **Trained Models:** Saved in `models/` directory with appropriate filenames.
-  - **Evaluation Metrics:** Saved in `metrics/classification_metrics.csv`
+- `predictions.dta`: Contains actual and predicted `Purchase` values.
+- `model_coefficients.txt`: Lists coefficients and standard errors of the selected classification model.
+- `evaluation_metrics.dta`: Contains Accuracy, Precision, Recall, and F1-Score of the selected model.
 
-### 3. Model Training and Evaluation
+## Outputs
 
-**AutoMLSelect** handles the entire workflow of model training, prediction, and evaluation. After running the commands, you can find the trained models and evaluation metrics in the specified directories.
+The `automlselect` command generates the following outputs in the specified `outpath` directory:
 
----
+### For Regression Tasks
 
-## Examples
+- **predictions.dta**:
+  
+  - Contains two variables: the actual target (`Price`) and the predicted target (`prediction`).
+- **model_coefficients.txt**:
+  
+  - A text file listing the coefficients and standard errors of the selected regression model.
+- **evaluation_metrics.dta**:
+  
+  - Contains evaluation metrics such as R² (R-squared) and RMSE (Root Mean Squared Error) for the selected model.
 
-### 1. `regression_example.do`
+### For Classification Tasks
 
-**File Path:**
-
-```
-AutoMLSelect/examples/regression_example.do
-```
-
-**Content:**
-
-```stata
-* regression_example.do
-* ======================
-* Example of using AutoMLSelect for Regression Task
-* Author: [Your Name]
-* Date: 2024-04-27
-* Version: 2.3
-
-clear all
-set more off
-
-* Load Sample Regression Data
-use "data/sample_regression_data.dta", clear
-
-* Run AutoMLSelect for Regression
-automlselect regression, ///
-    target(Price) ///
-    predictors(Size Bedrooms Age Location_east Location_north Location_south Location_west) ///
-    num_trees(200) ///
-    mtry(3) ///
-    max_depth(10) ///
-    save_model("models/regression_model") ///
-    save_metrics("metrics/regression_metrics.csv")
-```
-
-### 2. `classification_example.do`
-
-**File Path:**
-
-```
-AutoMLSelect/examples/classification_example.do
-```
-
-**Content:**
-
-```stata
-* classification_example.do
-* ==========================
-* Example of using AutoMLSelect for Classification Task
-* Author: [Your Name]
-* Date: 2024-04-27
-* Version: 2.3
-
-clear all
-set more off
-
-* Load Sample Classification Data
-use "data/sample_classification_data.dta", clear
-
-* Run AutoMLSelect for Classification
-automlselect classification, ///
-    target(Purchase) ///
-    predictors(Age Gender_female Gender_male Income Region_east Region_north Region_south Region_west) ///
-    num_trees(200) ///
-    mtry(4) ///
-    max_depth(10) ///
-    save_model("models/classification_model") ///
-    save_metrics("metrics/classification_metrics.csv")
-```
-
----
-
-## Testing
-
-The **`AutoMLSelect`** package includes comprehensive test scripts to ensure all functionalities work as expected.
-
-### 1. Regression Tests
-
-**File Path:**
-
-```
-AutoMLSelect/tests/test_regression.do
-```
-
-**Usage:**
-
-```stata
-do tests/test_regression.do
-```
-
-### 2. Classification Tests
-
-**File Path:**
-
-```
-AutoMLSelect/tests/test_classification.do
-```
-
-**Usage:**
-
-```stata
-do tests/test_classification.do
-```
-
----
+- **predictions.dta**:
+  
+  - Contains two variables: the actual target (`Purchase`) and the predicted target (`final_prediction`).
+- **model_coefficients.txt**:
+  
+  - A text file listing the coefficients and standard errors of the selected classification model.
+- **evaluation_metrics.dta**:
+  
+  - Contains evaluation metrics such as Accuracy, Precision, Recall, and F1-Score for the selected model.
 
 ## Troubleshooting
 
-### **1. Installing `randomforest` Package Not Found**
+If you encounter issues while using the AutoMLSelect package, consider the following tips:
 
-If you encounter the error:
+### 1. Unsupported File Format
 
-```
-ssc install randomforest
-ssc install: "randomforest" not found at SSC, type search randomforest
-(To find all packages at SSC that start with r, type ssc describe r)
-r(601);
-```
+**Issue:** `Unsupported file format '.xyz'. Please provide CSV, Excel, or Stata (.dta) files.`
 
-**Solution:**
+**Solution:** Ensure your data files are in one of the supported formats (`.dta`, `.csv`, `.xlsx`, etc.).
 
-1. **Install the `rforest` Package Instead:**
-   
-   ```stata
-   ssc install rforest
-   ```
-2. **Manual Installation Steps:**
-   
-   - **Download `rforest`:** Visit the [Stata Journal](http://www.stata-journal.com/software/sj20-1/rforest/) to download the `rforest` package.
-   - **Extract and Move Files:** Extract the downloaded files and place them in your personal ado-directory (e.g., `C:\Users\YourName\ado\personal\`).
-   - **Verify Installation:**
-     
-     ```stata
-     which rforest
-     ```
-     
-     Stata should display the path to the `rforest.ado` file.
-3. **Update `AutoMLSelect` Ado-Files to Use `rforest`:**
-   
-   Ensure that in the `train_random_forest_regression.ado` and `train_random_forest_classification.ado` files, the `randomforest` command is replaced with `rforest`.
+### 2. Missing Target Variable
 
----
+**Issue:** `Variable 'Price' does not exist in the dataset.`
 
-## Contributing
+**Solution:** Verify that the target variable (`Price` or `Purchase`) is correctly named and exists in your dataset.
 
-Contributions are welcome! Please follow these steps to contribute:
+### 3. Invalid Task Type
 
-1. **Fork the Repository**
-2. **Create a New Branch**
-3. **Make Your Changes**
-4. **Submit a Pull Request**
+**Issue:** `Invalid task type 'analysis'. Use 'regression' or 'classification'.`
 
-Ensure that all tests pass and documentation is updated accordingly.
+**Solution:** Ensure that the `task` parameter is either `"regression"` or `"classification"`.
 
----
+### 4. Non-Numeric Numerical Columns
+
+**Issue:** `Variable 'Age' is not numeric.`
+
+**Solution:** Confirm that all columns specified in `numcols` are numeric. Convert them if necessary using `encode` or appropriate data transformation commands.
+
+### 5. Missing Columns
+
+**Issue:** `Numerical variable 'Size' does not exist in the dataset.`
+
+**Solution:** Check that all specified numerical and categorical columns are present in your dataset and correctly spelled.
+
+## Extensibility
+
+The AutoMLSelect package is designed to be easily extendable. Here’s how you can enhance its functionality:
+
+### Adding New Models
+
+1. **Implement the New Model:** Add the code for the new model within the `automlselect.ado` file as a separate program.
+2. **Update Model Selection Logic:** Modify the model selection section to include performance metrics from the new model.
+3. **Adjust Output Saving:** Update the `save_outputs` program if additional outputs are necessary for the new model.
+
+### Enhancing Performance Metrics
+
+- Incorporate more advanced metrics such as AUC for classification or Adjusted R² for regression.
+- Allow users to specify which metrics to prioritize during model selection.
+
+### Incorporating Cross-Validation
+
+- Implement cross-validation techniques to provide more robust evaluation metrics.
+- Allow users to specify the number of folds or the type of cross-validation.
+
+## Contribution
+
+Contributions to the AutoMLSelect package are welcome! If you have suggestions, bug reports, or enhancements, please open an issue or submit a pull request on the repository.
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+AutoMLSelect is released under the MIT License. See the [LICENSE](LICENSE) file for more details.
 
----
+## Author
 
-**Happy Modeling with AutoMLSelect!** If you encounter any further issues or have additional questions, feel free to reach out. I'm here to help!
+Your Name
 
+Your Contact Information
+
+## Acknowledgements
+
+Special thanks to all contributors and users who help improve the AutoMLSelect package.
 
