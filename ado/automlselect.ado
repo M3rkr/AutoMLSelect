@@ -1,166 +1,145 @@
-*! version 1.0
+*! version 2.3
 program define automlselect
     // =========================================================================
     // automlselect.ado
     // =========================================================================
     //
     // Description:
-    // Automates the machine learning workflow, including data preprocessing,
-    // model training, performance evaluation, and model selection for regression
-    // and classification tasks.
+    // Main entry point for the AutoMLSelect package. Facilitates training and evaluation
+    // of various machine learning models for regression and classification tasks.
     //
     // Syntax:
-    // automlselect using "data.csv", ///
+    // automlselect [regression|classification], ///
     //     target(target_variable) ///
     //     predictors(varlist) ///
-    //     [ task(regression|classification) ///
-    //       preprocess_options(...) ///
-    //       train_options(...) ///
-    //       evaluate_options(...) ///
-    //       select_options(...) ///
-    //       save_results(string) ]
+    //     [ num_trees(integer) ///
+    //       mtry(integer) ///
+    //       max_depth(integer) ///
+    //       save_model(string) ///
+    //       save_metrics(string) ]
     //
     // Options:
-    //   using("data.csv")         - Path to the input CSV file.
-    //   target(varname)          - Target variable for modeling.
-    //   predictors(varlist)      - List of predictor variables.
-    //   task(regression|classification) - Type of machine learning task.
-    //   preprocess_options(...)  - Additional options for data preprocessing.
-    //   train_options(...)       - Options for model training.
-    //   evaluate_options(...)    - Options for performance evaluation.
-    //   select_options(...)      - Options for model selection.
-    //   save_results(string)      - File path to save the best model details.
+    //   regression|classification - Specifies the type of task.
+    //   target(string)             - The target variable.
+    //   predictors(varlist)        - Predictor variables.
+    //   num_trees(integer)         - (Random Forest) Number of trees. Default is 100.
+    //   mtry(integer)              - (Random Forest) Number of variables sampled at each split.
+    //                               Default is sqrt(number of predictors).
+    //   max_depth(integer)         - (Random Forest) Maximum depth of each tree. Default is unlimited.
+    //   save_model(string)         - Filename to save the trained model.
+    //   save_metrics(string)       - Filename to save the evaluation metrics.
     //
     // Example:
-    // automlselect using "data.csv", ///
+    // automlselect regression, ///
     //     target(Price) ///
-    //     predictors(Size Bedrooms Age Location) ///
-    //     task(regression) ///
-    //     preprocess_options(handle_missing(mean mode) encode_onehot) ///
-    //     train_options(models(linear_regression random_forest)) ///
-    //     evaluate_options(metrics(R-squared RMSE)) ///
-    //     select_options(metric("R-squared") maximize) ///
-    //     save_results("best_model.csv")
+    //     predictors(Size Bedrooms Age Location_east Location_north Location_south Location_west) ///
+    //     num_trees(200) ///
+    //     mtry(3) ///
+    //     max_depth(10) ///
+    //     save_model("models/regression_model") ///
+    //     save_metrics("metrics/regression_metrics.csv")
+    //
+    // automlselect classification, ///
+    //     target(Purchase) ///
+    //     predictors(Age Gender_female Gender_male Income Region_east Region_north Region_south Region_west) ///
+    //     num_trees(200) ///
+    //     mtry(4) ///
+    //     max_depth(10) ///
+    //     save_model("models/classification_model") ///
+    //     save_metrics("metrics/classification_metrics.csv")
     //
     // =========================================================================
-
+    
     version 16.0
-    syntax using/ , ///
+    syntax [, ///
+        regression | classification ///
         target(string) ///
         predictors(string) ///
-        [ task(string) ///
-          preprocess_options(string) ///
-          train_options(string) ///
-          evaluate_options(string) ///
-          select_options(string) ///
-          save_results(string) ]
-
-    // Default task is regression if not specified
-    if "`task'" == "" {
-        local task "regression"
+        [ num_trees(integer) ///
+          mtry(integer) ///
+          max_depth(integer) ///
+          save_model(string) ///
+          save_metrics(string) ]]
+    
+    if "`regression'" != "" & "`classification'" != "" {
+        display as error "Please specify either 'regression' or 'classification', not both."
+        exit 198
     }
-
-    // -------------------------------------------------------------------------
-    // 1. Data Preprocessing
-    // -------------------------------------------------------------------------
-    display "Starting Data Preprocessing..."
-    preprocess_data using "`using'", ///
-        target(`"`target'"') ///
-        predictors(`"`predictors'"') ///
-        `preprocess_options'
-
-    // -------------------------------------------------------------------------
-    // 2. Model Training
-    // -------------------------------------------------------------------------
-    display "Starting Model Training..."
-    // Parse train_options to identify models to train
-    tokenize "`train_options'"
-    local models_list
-    while "`1'" != "" {
-        local models_list `models_list' `1'
-        macro shift
+    
+    if "`regression'" == "" & "`classification'" == "" {
+        display as error "Please specify the task type: 'regression' or 'classification'."
+        exit 198
     }
-
-    foreach model of local models_list {
-        if "`model'" == "linear_regression" {
-            train_linear_regression, ///
-                target(`"`target'"') ///
-                predictors(`"`predictors'"') ///
-                `train_options'
-        }
-        else if "`model'" == "logistic_regression" {
-            train_logistic_regression, ///
-                target(`"`target'"') ///
-                predictors(`"`predictors'"') ///
-                `train_options'
-        }
-        else if "`model'" == "random_forest" {
-            train_random_forest, ///
-                target(`"`target'"') ///
-                predictors(`"`predictors'"') ///
-                `train_options'
-        }
-        else {
-            display as error "Unknown model type: `model'"
-            exit 198
-        }
+    
+    if "`target'" == "" {
+        display as error "Please specify the target variable using the 'target()' option."
+        exit 198
     }
-
-    // -------------------------------------------------------------------------
-    // 3. Performance Evaluation
-    // -------------------------------------------------------------------------
-    display "Starting Performance Evaluation..."
-    foreach model of local models_list {
-        if "`model'" == "linear_regression" {
-            evaluate_regression, ///
-                target(`"`target'"') ///
-                prediction(Price_pred_linear_regression) ///
-                `evaluate_options'
-        }
-        else if "`model'" == "logistic_regression" {
-            evaluate_classification, ///
-                target(`"`target'"') ///
-                prediction(Purchase_pred_logistic_regression) ///
-                probability(Purchase_prob_logistic_regression) ///
-                `evaluate_options'
-        }
-        else if "`model'" == "random_forest" {
-            if "`task'" == "regression" {
-                evaluate_regression, ///
-                    target(`"`target'"') ///
-                    prediction(Random_Forest_pred_regression) ///
-                    `evaluate_options'
-            }
-            else if "`task'" == "classification" {
-                evaluate_classification, ///
-                    target(`"`target'"') ///
-                    prediction(Random_Forest_pred_classification) ///
-                    probability(Random_Forest_prob_classification) ///
-                    `evaluate_options'
-            }
-        }
+    
+    if "`predictors'" == "" {
+        display as error "Please specify predictor variables using the 'predictors()' option."
+        exit 198
     }
-
-    // -------------------------------------------------------------------------
-    // 4. Model Selection
-    // -------------------------------------------------------------------------
-    display "Starting Model Selection..."
+    
+    // Determine task type
+    if "`regression'" != "" {
+        local task = "regression"
+    }
+    else {
+        local task = "classification"
+    }
+    
+    // Determine which model to train
+    // For Regression: Linear Regression and Random Forest Regression
+    // For Classification: Logistic Regression and Random Forest Classification
+    
+    // Train Linear or Logistic Regression
     if "`task'" == "regression" {
-        select_best_model using "combined_regression_metrics.csv", ///
-            task(regression) ///
-            `select_options' ///
-            save_results("`save_results'")
+        display "Training Linear Regression Model..."
+        train_linear_regression, ///
+            target(`target') ///
+            predictors(`predictors') ///
+            robust ///
+            save("`save_model'")
     }
     else if "`task'" == "classification" {
-        select_best_model using "combined_classification_metrics.csv", ///
-            task(classification) ///
-            `select_options' ///
-            save_results("`save_results'")
+        display "Training Logistic Regression Model..."
+        train_logistic_regression, ///
+            target(`target') ///
+            predictors(`predictors') ///
+            robust ///
+            save("`save_model'")
     }
-
-    // -------------------------------------------------------------------------
-    // 5. Completion Message
-    // -------------------------------------------------------------------------
-    display "AutoMLSelect Workflow Completed Successfully."
-
+    
+    // Train Random Forest if options are provided
+    if "`num_trees'" != "" | "`mtry'" != "" | "`max_depth'" != "" {
+        if "`task'" == "regression" {
+            display "Training Random Forest Regression Model..."
+            train_random_forest_regression, ///
+                target(`target') ///
+                predictors(`predictors') ///
+                num_trees(`num_trees') ///
+                mtry(`mtry') ///
+                max_depth(`max_depth') ///
+                save("`save_model'_rf.dta")
+        }
+        else if "`task'" == "classification" {
+            display "Training Random Forest Classification Model..."
+            train_random_forest_classification, ///
+                target(`target') ///
+                predictors(`predictors') ///
+                num_trees(`num_trees') ///
+                mtry(`mtry') ///
+                max_depth(`max_depth') ///
+                save("`save_model'_rf.dta")
+        }
+    }
+    
+    // Evaluate Models
+    display "Evaluating Trained Models..."
+    evaluate_models, ///
+        target(`target') ///
+        save_metrics(`save_metrics')
+    
+    display "AutoMLSelect process completed successfully."
 end

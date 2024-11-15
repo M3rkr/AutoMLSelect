@@ -1,53 +1,55 @@
-*! version 1.0
+*! version 2.3
 program define train_linear_regression
     // =========================================================================
     // train_linear_regression.ado
     // =========================================================================
     //
     // Description:
-    // Trains a linear regression model using the specified target and predictor variables.
+    // Trains a Linear Regression model using the specified target and predictors.
     //
     // Syntax:
     // train_linear_regression, ///
     //     target(target_variable) ///
     //     predictors(varlist) ///
-    //     [ robust ]
+    //     robust ///
+    //     save(filename)
     //
     // Options:
-    //   target(varname)      - Target variable for the regression model.
-    //   predictors(varlist)  - Predictor variables for the regression model.
-    //   robust                - Use robust standard errors.
+    //   target(string)         - The target variable for regression.
+    //   predictors(varlist)    - Predictor variables.
+    //   robust                 - Use robust standard errors.
+    //   save(string)           - Filename to save the trained model.
     //
     // Example:
     // train_linear_regression, ///
     //     target(Price) ///
-    //     predictors(Size Bedrooms Age Location_north Location_south) ///
-    //     robust
+    //     predictors(Size Bedrooms Age Location_east Location_north Location_south Location_west) ///
+    //     robust ///
+    //     save("models/linear_regression_model.dta")
     //
     // =========================================================================
-
+    
     version 16.0
     syntax , ///
         target(string) ///
         predictors(string) ///
-        [ robust ]
-
-    // -------------------------------------------------------------------------
-    // 1. Train Linear Regression Model
-    // -------------------------------------------------------------------------
+        [ robust ///
+          save(string) ]
+    
+    // Train Linear Regression Model
     display "Training Linear Regression Model..."
-    if "`robust'" != "" {
-        regress `target' `predictors', robust
+    regress `target' `predictors', robust
+    
+    if _rc {
+        display as error "Linear Regression training failed."
+        exit 198
     }
-    else {
-        regress `target' `predictors'
+    
+    // Save the model
+    if "`save'" != "" {
+        estimates store lr_model
+        save "`save'", replace
     }
-
-    // -------------------------------------------------------------------------
-    // 2. Save Model Estimates
-    // -------------------------------------------------------------------------
-    local model_name "linear_regression"
-    estimates store `model_name'
-    display "Linear Regression Model trained and estimates stored as `model_name'."
-
+    
+    display "Linear Regression model trained and saved to `save'."
 end

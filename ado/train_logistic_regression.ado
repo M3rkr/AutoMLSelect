@@ -1,53 +1,55 @@
-*! version 1.0
+*! version 2.3
 program define train_logistic_regression
     // =========================================================================
     // train_logistic_regression.ado
     // =========================================================================
     //
     // Description:
-    // Trains a logistic regression model using the specified target and predictor variables.
+    // Trains a Logistic Regression model using the specified target and predictors.
     //
     // Syntax:
     // train_logistic_regression, ///
     //     target(target_variable) ///
     //     predictors(varlist) ///
-    //     [ robust ]
+    //     robust ///
+    //     save(filename)
     //
     // Options:
-    //   target(varname)      - Binary target variable for the logistic regression model.
-    //   predictors(varlist)  - Predictor variables for the logistic regression model.
-    //   robust                - Use robust standard errors.
+    //   target(string)         - The target variable for classification.
+    //   predictors(varlist)    - Predictor variables.
+    //   robust                 - Use robust standard errors.
+    //   save(string)           - Filename to save the trained model.
     //
     // Example:
     // train_logistic_regression, ///
     //     target(Purchase) ///
-    //     predictors(Age Gender_income Income) ///
-    //     robust
+    //     predictors(Age Gender_female Gender_male Income Region_east Region_north Region_south Region_west) ///
+    //     robust ///
+    //     save("models/logistic_regression_model.dta")
     //
     // =========================================================================
-
+    
     version 16.0
     syntax , ///
         target(string) ///
         predictors(string) ///
-        [ robust ]
-
-    // -------------------------------------------------------------------------
-    // 1. Train Logistic Regression Model
-    // -------------------------------------------------------------------------
+        [ robust ///
+          save(string) ]
+    
+    // Train Logistic Regression Model
     display "Training Logistic Regression Model..."
-    if "`robust'" != "" {
-        logistic `target' `predictors', vce(robust)
+    logistic `target' `predictors', robust
+    
+    if _rc {
+        display as error "Logistic Regression training failed."
+        exit 198
     }
-    else {
-        logistic `target' `predictors'
+    
+    // Save the model
+    if "`save'" != "" {
+        estimates store lr_model
+        save "`save'", replace
     }
-
-    // -------------------------------------------------------------------------
-    // 2. Save Model Estimates
-    // -------------------------------------------------------------------------
-    local model_name "logistic_regression"
-    estimates store `model_name'
-    display "Logistic Regression Model trained and estimates stored as `model_name'."
-
+    
+    display "Logistic Regression model trained and saved to `save'."
 end

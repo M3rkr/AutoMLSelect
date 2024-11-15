@@ -1,121 +1,78 @@
-*! version 1.0
+*! version 2.3
 program define select_best_model
     // =========================================================================
     // select_best_model.ado
     // =========================================================================
     //
     // Description:
-    // Selects the best-performing model from a set of models based on a specified
-    // performance metric and direction (maximize or minimize).
+    // Selects the best-performing model based on the specified metric.
     //
     // Syntax:
-    // select_best_model using "metrics.csv", ///
+    // select_best_model, ///
+    //     using(filename) ///
     //     task(regression|classification) ///
     //     metric(metric_name) ///
     //     direction(maximize|minimize) ///
-    //     [ save_results(string) ]
+    //     save_results(filename)
     //
     // Options:
-    //   using("metrics.csv")      - Path to the CSV file containing model metrics.
-    //   task(regression|classification) - Type of machine learning task.
-    //   metric(metric_name)      - Performance metric to base selection on.
+    //   using(string)            - The metrics CSV file.
+    //   task(regression|classification) - The type of task.
+    //   metric(string)           - The metric to base selection on.
     //   direction(maximize|minimize) - Whether to maximize or minimize the metric.
-    //   save_results(string)      - (Optional) File path to save the best model's details as CSV.
+    //   save_results(string)     - Filename to save the best model details.
     //
     // Example:
-    // select_best_model using "combined_regression_metrics.csv", ///
+    // select_best_model, ///
+    //     using("metrics/combined_regression_metrics.csv") ///
     //     task(regression) ///
-    //     metric("R-squared") ///
-    //     direction(maximize) ///
-    //     save_results("best_regression_model.csv")
+    //     metric(RMSE) ///
+    //     direction(minimize) ///
+    //     save_results("metrics/best_regression_model.csv")
     //
     // =========================================================================
-
+    
     version 16.0
-    syntax using/ , ///
+    syntax using(string) , ///
         task(string) ///
         metric(string) ///
         direction(string) ///
         [ save_results(string) ]
-
-    // -------------------------------------------------------------------------
-    // 1. Validate Task Type
-    // -------------------------------------------------------------------------
-    if "`task'" != "regression" & "`task'" != "classification" {
-        display as error "Error: Task type must be either 'regression' or 'classification'."
-        exit 198
-    }
-
-    // -------------------------------------------------------------------------
-    // 2. Validate Direction
-    // -------------------------------------------------------------------------
-    if "`direction'" != "maximize" & "`direction'" != "minimize" {
-        display as error "Error: Direction must be either 'maximize' or 'minimize'."
-        exit 198
-    }
-
-    // -------------------------------------------------------------------------
-    // 3. Load Metrics Data
-    // -------------------------------------------------------------------------
-    display "Importing metrics from `using'..."
+    
+    // Load metrics
     import delimited using "`using'", clear
-
-    // -------------------------------------------------------------------------
-    // 4. Validate Presence of Metric Column
-    // -------------------------------------------------------------------------
-    ds, has(`"`metric'"')
-    if "`r(varlist)'" == "" {
-        display as error "Error: The specified metric '`metric'' does not exist in the dataset."
+    
+    // Check if metric exists
+    count if metric == "`metric'"
+    if r(N) == 0 {
+        display as error "Metric '`metric'' not found in the metrics file."
         exit 198
     }
-
-    // -------------------------------------------------------------------------
-    // 5. Validate Presence of Model Column
-    // -------------------------------------------------------------------------
-    ds, has(model)
-    if "`r(varlist)'" == "" {
-        display as error "Error: The metrics dataset must contain a 'model' column identifying each model."
-        exit 198
-    }
-
-    // -------------------------------------------------------------------------
-    // 6. Select the Best Model Based on the Specified Metric and Direction
-    // -------------------------------------------------------------------------
-    display "Selecting the best model based on `metric' and `direction'..."
-
-    // Depending on direction, sort and select the best
+    
+    // Select best model based on metric and direction
     if "`direction'" == "maximize" {
-        sort `"`metric'"'
-        gsort -`"`metric'"'
+        quietly sort - value
     }
     else if "`direction'" == "minimize" {
-        sort `"`metric'"'
+        quietly sort value
     }
-
-    // The first observation is the best model
+    else {
+        display as error "Invalid direction '`direction''. Use 'maximize' or 'minimize'."
+        exit 198
+    }
+    
+    // Get the top model
     local best_model = model[1]
-    local best_metric = `"`metric'"'[1]
-
-    // Display the best model and its metric
-    display as text "----------------------------------------"
-    display as text "Best Model Selection:"
-    display as text "----------------------------------------"
-    display as result "Model: `best_model'"
-    display as text "`metric': `best_metric'"
-    display as text "----------------------------------------"
-
-    // -------------------------------------------------------------------------
-    // 7. Save the Best Model's Details if Specified
-    // -------------------------------------------------------------------------
+    local best_value = value[1]
+    
+    // Save the best model details
     if "`save_results'" != "" {
-        keep if model == "`best_model'"
+        clear
+        input str25 model double value
+        "`best_model'" `best_value'
+        end
         export delimited using "`save_results'", replace
-        if _rc == 0 {
-            display "Best model details saved to '`save_results''."
-        }
-        else {
-            display as error "Error: Failed to save best model details to '`save_results''."
-        }
     }
-
+    
+    display "Best model based on `metric' (`direction'): `best_model' with value `best_value'."
 end
