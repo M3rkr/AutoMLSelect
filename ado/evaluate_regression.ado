@@ -9,9 +9,9 @@ program define evaluate_regression
     //
     // Syntax:
     // evaluate_regression, ///
-    //     target(target_variable) ///
-    //     prediction(predicted_variable) ///
-    //     save_metrics(filename)
+    //     target("Price") ///
+    //     prediction("Price_pred_linear_regression") ///
+    //     save_metrics("metrics/regression_metrics.csv")
     //
     // Options:
     //   target(string)         - The true target variable.
@@ -20,8 +20,8 @@ program define evaluate_regression
     //
     // Example:
     // evaluate_regression, ///
-    //     target(Price) ///
-    //     prediction(Price_pred_linear_regression) ///
+    //     target("Price") ///
+    //     prediction("Price_pred_linear_regression") ///
     //     save_metrics("metrics/regression_metrics.csv")
     //
     // =========================================================================
@@ -41,43 +41,51 @@ program define evaluate_regression
         exit 198
     }
     
-    // Calculate evaluation metrics
-    display "Calculating Regression Metrics..."
+    // Preserve the current data
+    preserve
+    
+    // Calculate residuals
     generate double residual = `target' - `prediction'
     
-    // RMSE
-    quietly summarize residual, meanonly
-    generate double mse = mean(residual^2)
-    generate double RMSE = sqrt(mse)
+    // Calculate RMSE
+    generate double residual_sq = residual^2
+    quietly summarize residual_sq, meanonly
+    local mse = r(mean)
+    local rmse = sqrt(`mse')
     
-    // MAE
+    // Calculate MAE
     generate double abs_residual = abs(residual)
-    summarize abs_residual, meanonly
-    generate double MAE = r(mean)
+    quietly summarize abs_residual, meanonly
+    local mae = r(mean)
     
-    // MAPE
-    generate double abs_percentage_error = abs(residual / `target') * 100
-    summarize abs_percentage_error, meanonly
-    generate double MAPE = r(mean)
+    // Calculate MAPE
+    generate double abs_percentage_error = (abs(residual) / abs(`target')) * 100
+    quietly summarize abs_percentage_error, meanonly
+    local mape = r(mean)
     
-    // R-squared
+    // Calculate R-squared
     regress `target' `prediction'
-    local R_squared = e(r2)
+    local rsquared = e(r2)
     
-    // Create metrics dataset
-    clear
-    input str25 metric double value
-    "RMSE" .
-    "R-squared" .
-    "MAE" .
-    "MAPE" .
-    end
-    replace value = RMSE in 1
-    replace value = `R_squared' in 2
-    replace value = MAE in 3
-    replace value = MAPE in 4
+    // Restore original data
+    restore
     
-    // Save metrics
+    // Initialize postfile
+    tempfile metrics_temp
+    postfile handle str25 metric double value using "`metrics_temp'"
+    
+    // Post metrics
+    post handle ("RMSE") (`rmse')
+    post handle ("R-squared") (`rsquared')
+    post handle ("MAE") (`mae')
+    post handle ("MAPE") (`mape')
+    
+    // Close postfile
+    postclose handle
+    
+    // Load metrics and export
+    use "`metrics_temp'", clear
     export delimited using "`save_metrics'", replace
+    
     display "Regression metrics saved to `save_metrics'."
 end

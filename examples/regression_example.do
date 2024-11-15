@@ -13,8 +13,8 @@ use "data/sample_regression_data.dta", clear
 
 * Run AutoMLSelect for Regression
 automlselect regression, ///
-    target(Price) ///
-    predictors(Size Bedrooms Age Location_east Location_north Location_south Location_west) ///
+    target("Price") ///
+    predictors("Size Bedrooms Age Location_east Location_north Location_south Location_west") ///
     num_trees(200) ///
     mtry(3) ///
     max_depth(10) ///

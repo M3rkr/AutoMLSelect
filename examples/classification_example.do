@@ -13,8 +13,8 @@ use "data/sample_classification_data.dta", clear
 
 * Run AutoMLSelect for Classification
 automlselect classification, ///
-    target(Purchase) ///
-    predictors(Age Gender_female Gender_male Income Region_east Region_north Region_south Region_west) ///
+    target("Purchase") ///
+    predictors("Age Gender_female Gender_male Income Region_east Region_north Region_south Region_west") ///
     num_trees(200) ///
     mtry(4) ///
     max_depth(10) ///

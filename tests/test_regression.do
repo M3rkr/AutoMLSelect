@@ -28,34 +28,57 @@ foreach var in Price Size Bedrooms Age Location_east Location_north Location_sou
 
 * Train Linear Regression
 train_linear_regression, ///
-    target(Price) ///
-    predictors(Size Bedrooms Age Location_east Location_north Location_south Location_west) ///
+    target("Price") ///
+    predictors("Size Bedrooms Age Location_east Location_north Location_south Location_west") ///
     robust ///
     save("models/linear_regression_test_model.dta")
 
 * Predict
 use "data/sample_regression_data.dta", clear
+
 predict double Price_pred_linear_regression
 
 * Evaluate
 evaluate_regression, ///
-    target(Price) ///
-    prediction(Price_pred_linear_regression) ///
+    target("Price") ///
+    prediction("Price_pred_linear_regression") ///
     save_metrics("metrics/linear_regression_test_metrics.csv")
 
 * Assertions
-assert _rc == 0, "Test Case 1 Failed: Linear regression model training failed."
+if (_rc != 0) {
+    display as error "Test Case 1 Failed: Regression evaluation failed."
+    exit 198
+}
 
-assert !missing(Price_pred_linear_regression[1]), ///
-    "Test Case 1 Failed: Predicted values not generated."
+* Verify that the metrics file exists
+capture confirm file "metrics/linear_regression_test_metrics.csv"
+if (_rc != 0) {
+    display as error "Test Case 1 Failed: Metrics file not found."
+    exit 198
+}
 
-assert fileexists("metrics/linear_regression_test_metrics.csv"), ///
-    "Test Case 1 Failed: Metrics file not found."
-
+* Verify contents of the metrics file
 import delimited using "metrics/linear_regression_test_metrics.csv", clear
-assert inlist("RMSE", metric) & inlist("R-squared", metric) & ///
-       inlist("MAE", metric) & inlist("MAPE", metric), ///
-       "Test Case 1 Failed: Expected regression metrics are missing."
+if (_N != 4) {
+    display as error "Test Case 1 Failed: Incorrect number of metrics."
+    exit 198
+}
+
+* Check for each required metric
+local metrics_found = 0
+foreach metric in RMSE "R-squared" MAE MAPE {
+    count if metric == "`metric'"
+    if (_N == 0) {
+        display as error "Test Case 1 Failed: `metric' metric missing."
+        exit 198
+    }
+    local metrics_found = `metrics_found' + 1
+}
+
+if (`metrics_found' != 4) {
+    display as error "Test Case 1 Failed: Not all required metrics are present."
+    exit 198
+}
 
 display as text "Test Case 1 Passed."
 
@@ -66,8 +89,8 @@ display as text "Running Test Case 2: Successful Training and Evaluation of Rand
 
 * Train Random Forest Regression
 train_random_forest_regression, ///
-    target(Price) ///
-    predictors(Size Bedrooms Age Location_east Location_north Location_south Location_west) ///
+    target("Price") ///
+    predictors("Size Bedrooms Age Location_east Location_north Location_south Location_west") ///
     num_trees(200) ///
     mtry(3) ///
     max_depth(10) ///
@@ -75,27 +98,50 @@ train_random_forest_regression, ///
 
 * Predict
 use "data/sample_regression_data.dta", clear
+
 predict double Price_pred_random_forest_regression
 
 * Evaluate
 evaluate_regression, ///
-    target(Price) ///
-    prediction(Price_pred_random_forest_regression) ///
+    target("Price") ///
+    prediction("Price_pred_random_forest_regression") ///
     save_metrics("metrics/random_forest_regression_test_metrics.csv")
 
 * Assertions
-assert _rc == 0, "Test Case 2 Failed: Random Forest regression model training failed."
+if (_rc != 0) {
+    display as error "Test Case 2 Failed: Random Forest regression evaluation failed."
+    exit 198
+}
 
-assert !missing(Price_pred_random_forest_regression[1]), ///
-    "Test Case 2 Failed: Predicted values not generated."
+* Verify that the metrics file exists
+capture confirm file "metrics/random_forest_regression_test_metrics.csv"
+if (_rc != 0) {
+    display as error "Test Case 2 Failed: Metrics file not found."
+    exit 198
+}
 
-assert fileexists("metrics/random_forest_regression_test_metrics.csv"), ///
-    "Test Case 2 Failed: Metrics file not found."
-
+* Verify contents of the metrics file
 import delimited using "metrics/random_forest_regression_test_metrics.csv", clear
-assert inlist("RMSE", metric) & inlist("R-squared", metric) & ///
-       inlist("MAE", metric) & inlist("MAPE", metric), ///
-       "Test Case 2 Failed: Expected regression metrics are missing."
+if (_N != 4) {
+    display as error "Test Case 2 Failed: Incorrect number of metrics."
+    exit 198
+}
+
+* Check for each required metric
+local metrics_found_rf = 0
+foreach metric in RMSE "R-squared" MAE MAPE {
+    count if metric == "`metric'"
+    if (_N == 0) {
+        display as error "Test Case 2 Failed: `metric' metric missing."
+        exit 198
+    }
+    local metrics_found_rf = `metrics_found_rf' + 1
+}
+
+if (`metrics_found_rf' != 4) {
+    display as error "Test Case 2 Failed: Not all required metrics are present."
+    exit 198
+}
 
 display as text "Test Case 2 Passed."
 
@@ -123,10 +169,15 @@ capture {
 }
 
 * Assertions
-assert _rc != 0, "Test Case 3 Failed: select_best_model did not fail with invalid metric."
+if (_rc == 0) {
+    display as error "Test Case 3 Failed: select_best_model should have failed with invalid metric."
+    exit 198
+}
 
-assert !fileexists("metrics/best_regression_invalid_metric.csv"), ///
-    "Test Case 3 Failed: Best model file should not be created with invalid metric."
+if (fileexists("metrics/best_regression_invalid_metric.csv")) {
+    display as error "Test Case 3 Failed: Best model file should not be created with invalid metric."
+    exit 198
+}
 
 display as text "Test Case 3 Passed."
 

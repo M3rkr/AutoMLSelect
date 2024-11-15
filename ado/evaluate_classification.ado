@@ -22,9 +22,9 @@ program define evaluate_classification
     //
     // Example:
     // evaluate_classification, ///
-    //     target(Purchase) ///
-    //     prediction(Purchase_pred_logistic_regression) ///
-    //     probability(Purchase_prob_logistic_regression) ///
+    //     target("Purchase") ///
+    //     prediction("Purchase_pred_logistic_regression") ///
+    //     probability("Purchase_prob_logistic_regression") ///
     //     save_metrics("metrics/classification_metrics.csv")
     //
     // =========================================================================
@@ -46,10 +46,7 @@ program define evaluate_classification
         exit 198
     }
     
-    // Calculate evaluation metrics
-    display "Calculating Classification Metrics..."
-    
-    // Confusion Matrix Components
+    // Calculate confusion matrix components
     quietly tabulate `target' `prediction', matcell(cm)
     matrix list cm
     local TN = cm[1,1]
@@ -57,7 +54,7 @@ program define evaluate_classification
     local FP = cm[1,2]
     local FN = cm[2,1]
     
-    // Calculate Metrics
+    // Calculate metrics
     local Accuracy = (`TP' + `TN') / (`TP' + `TN' + `FP' + `FN')
     local Precision = (`TP' + `FP') > 0 ? (`TP' / (`TP' + `FP')) : 0
     local Recall = (`TP' + `FN') > 0 ? (`TP' / (`TP' + `FN')) : 0
@@ -77,12 +74,4 @@ program define evaluate_classification
     "AUC" .
     end
     replace value = `Accuracy' in 1
-    replace value = `Precision' in 2
-    replace value = `Recall' in 3
-    replace value = `F1_Score' in 4
-    replace value = `AUC' in 5
-    
-    // Save metrics
-    export delimited using "`save_metrics'", replace
-    display "Classification metrics saved to `save_metrics'."
-end
+    replace value = `Precis
