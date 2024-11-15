@@ -33,19 +33,34 @@ program define evaluate_regression
         save_metrics(string)
     
     // Check if variables exist
-    if "`target'" == "" | "`prediction'" == "" {
-        display as error "Both target and prediction variables must be specified."
+    confirm variable `target'
+    confirm variable `prediction'
+    
+    if _rc {
+        display as error "One or both specified variables do not exist."
         exit 198
     }
     
     // Calculate evaluation metrics
     display "Calculating Regression Metrics..."
     generate double residual = `target' - `prediction'
-    summarize residual, meanonly
-    generate double RMSE = sqrt(mean(residual^2))
-    summarize residual, meanonly
-    generate double MAE = mean(abs(residual))
-    generate double MAPE = mean(abs(residual / `target')) * 100
+    
+    // RMSE
+    quietly summarize residual, meanonly
+    generate double mse = mean(residual^2)
+    generate double RMSE = sqrt(mse)
+    
+    // MAE
+    generate double abs_residual = abs(residual)
+    summarize abs_residual, meanonly
+    generate double MAE = r(mean)
+    
+    // MAPE
+    generate double abs_percentage_error = abs(residual / `target') * 100
+    summarize abs_percentage_error, meanonly
+    generate double MAPE = r(mean)
+    
+    // R-squared
     regress `target' `prediction'
     local R_squared = e(r2)
     
@@ -57,10 +72,10 @@ program define evaluate_regression
     "MAE" .
     "MAPE" .
     end
-    replace value = `RMSE' in 1
+    replace value = RMSE in 1
     replace value = `R_squared' in 2
-    replace value = `MAE' in 3
-    replace value = `MAPE' in 4
+    replace value = MAE in 3
+    replace value = MAPE in 4
     
     // Save metrics
     export delimited using "`save_metrics'", replace

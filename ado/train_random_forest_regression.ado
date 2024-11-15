@@ -67,7 +67,7 @@ program define train_random_forest_regression
     
     // Train Random Forest Regression Model
     display "Training Random Forest Regression Model..."
-    randomforest `target' `predictors', ///
+    rforest `target' `predictors', ///
         ntree(`num_trees') ///
         mtry(`mtry') ///
         max_depth(`max_depth') ///

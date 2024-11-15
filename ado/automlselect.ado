@@ -24,7 +24,7 @@ program define automlselect
     //   predictors(varlist)        - Predictor variables.
     //   num_trees(integer)         - (Random Forest) Number of trees. Default is 100.
     //   mtry(integer)              - (Random Forest) Number of variables sampled at each split.
-    //                               Default is sqrt(number of predictors).
+    //                               Default is ceil(sqrt(number of predictors)).
     //   max_depth(integer)         - (Random Forest) Maximum depth of each tree. Default is unlimited.
     //   save_model(string)         - Filename to save the trained model.
     //   save_metrics(string)       - Filename to save the evaluation metrics.

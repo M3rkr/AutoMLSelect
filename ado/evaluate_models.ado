@@ -13,8 +13,8 @@ program define evaluate_models
     //     save_metrics(filename)
     //
     // Options:
-    //   target(string)      - The target variable.
-    //   save_metrics(string) - Filename to save the evaluation metrics.
+    //   target(string)        - The target variable.
+    //   save_metrics(string)  - Filename to save the evaluation metrics.
     //
     // Example:
     // evaluate_models, ///
@@ -38,77 +38,90 @@ program define evaluate_models
     foreach model_file of local model_files {
         display "Evaluating `model_file'..."
         
-        // Load the model
-        use "data/sample_regression_data.dta", clear // Adjust based on task type
-        
         // Determine model type based on filename
         if strpos("`model_file'", "linear_regression") {
-            // Predict using Linear Regression
+            // Regression Model: Linear Regression
+            use "data/sample_regression_data.dta", clear
             predict double pred_lr, xb
-            // Calculate regression metrics
-            generate double residual = Price - pred_lr
-            summarize residual, meanonly
-            local RMSE = sqrt(r(mean)^2)
-            quietly summarize residual, meanonly
-            generate double MAE = mean(abs(residual))
-            generate double MAPE = mean(abs(residual / Price)) * 100
-            regress Price pred_lr
-            local R_squared = e(r2)
+            // Evaluate
+            evaluate_regression, ///
+                target(Price) ///
+                prediction(pred_lr) ///
+                save_metrics("metrics/temp_lr_metrics.csv")
+            
+            // Load metrics
+            import delimited using "metrics/temp_lr_metrics.csv", clear
+            local RMSE = value[1]
+            local R_squared = value[2]
+            local MAE = value[3]
+            local MAPE = value[4]
+            
             // Post metrics
             post handle ("`model_file'") (`RMSE') (`R_squared') (`MAE') (`MAPE') (.) (.) (.) (.) (.)
         }
         else if strpos("`model_file'", "random_forest_regression") {
-            // Predict using Random Forest Regression
+            // Regression Model: Random Forest Regression
+            use "data/sample_regression_data.dta", clear
             predict double pred_rf_lr, xb
-            // Calculate regression metrics
-            generate double residual = Price - pred_rf_lr
-            summarize residual, meanonly
-            local RMSE = sqrt(r(mean)^2)
-            quietly summarize residual, meanonly
-            generate double MAE = mean(abs(residual))
-            generate double MAPE = mean(abs(residual / Price)) * 100
-            regress Price pred_rf_lr
-            local R_squared = e(r2)
+            // Evaluate
+            evaluate_regression, ///
+                target(Price) ///
+                prediction(pred_rf_lr) ///
+                save_metrics("metrics/temp_rf_lr_metrics.csv")
+            
+            // Load metrics
+            import delimited using "metrics/temp_rf_lr_metrics.csv", clear
+            local RMSE = value[1]
+            local R_squared = value[2]
+            local MAE = value[3]
+            local MAPE = value[4]
+            
             // Post metrics
             post handle ("`model_file'") (`RMSE') (`R_squared') (`MAE') (`MAPE') (.) (.) (.) (.) (.)
         }
         else if strpos("`model_file'", "logistic_regression") {
-            // Predict using Logistic Regression
+            // Classification Model: Logistic Regression
+            use "data/sample_classification_data.dta", clear
             predict double prob_lr, pr
             predict byte pred_class_lr
-            // Calculate classification metrics
-            quietly tabulate Purchase pred_class_lr, matcell(cm)
-            matrix list cm
-            local TN = cm[1,1]
-            local TP = cm[2,2]
-            local FP = cm[1,2]
-            local FN = cm[2,1]
-            local Accuracy = (`TP' + `TN') / (`TP' + `TN' + `FP' + `FN')
-            local Precision = `TP' / (`TP' + `FP')
-            local Recall = `TP' / (`TP' + `FN')
-            local F1_Score = 2 * (`Precision' * `Recall') / (`Precision' + `Recall')
-            roc Purchase prob_lr
-            local AUC = r(area)
+            // Evaluate
+            evaluate_classification, ///
+                target(Purchase) ///
+                prediction(pred_class_lr) ///
+                probability(prob_lr) ///
+                save_metrics("metrics/temp_lr_class_metrics.csv")
+            
+            // Load metrics
+            import delimited using "metrics/temp_lr_class_metrics.csv", clear
+            local Accuracy = value[1]
+            local Precision = value[2]
+            local Recall = value[3]
+            local F1_Score = value[4]
+            local AUC = value[5]
+            
             // Post metrics
-            post handle ("`model_file'") (.) (.) (.) (.) (`Accuracy') (`Precision') (`Recall') (`F1_Score') (`AUC')
+            post handle ("`model_file'") (.) (.) (.) (`Accuracy') (`Precision') (`Recall') (`F1_Score') (`AUC')
         }
         else if strpos("`model_file'", "random_forest_classification") {
-            // Predict using Random Forest Classification
+            // Classification Model: Random Forest Classification
+            use "data/sample_classification_data.dta", clear
             predict double prob_rf_class, pr
             predict byte pred_class_rf_class
-            // Calculate classification metrics
-            quietly tabulate Purchase pred_class_rf_class, matcell(cm)
-            matrix list cm
-            local TN = cm[1,1]
-            local TP = cm[2,2]
-            local FP = cm[1,2]
-            local FN = cm[2,1]
-            local Accuracy = (`TP' + `TN') / (`TP' + `TN' + `FP' + `FN')
-            local Precision = `TP' / (`TP' + `FP')
-            local Recall = `TP' / (`TP' + `FN')
-            local F1_Score = 2 * (`Precision' * `Recall') / (`Precision' + `Recall')
-            roc Purchase prob_rf_class
-            local AUC = r(area)
+            // Evaluate
+            evaluate_classification, ///
+                target(Purchase) ///
+                prediction(pred_class_rf_class) ///
+                probability(prob_rf_class) ///
+                save_metrics("metrics/temp_rf_class_metrics.csv")
+            
+            // Load metrics
+            import delimited using "metrics/temp_rf_class_metrics.csv", clear
+            local Accuracy = value[1]
+            local Precision = value[2]
+            local Recall = value[3]
+            local F1_Score = value[4]
+            local AUC = value[5]
+            
             // Post metrics
             post handle ("`model_file'") (.) (.) (.) (`Accuracy') (`Precision') (`Recall') (`F1_Score') (`AUC')
         }

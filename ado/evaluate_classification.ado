@@ -37,8 +37,12 @@ program define evaluate_classification
         save_metrics(string)
     
     // Check if variables exist
-    if "`target'" == "" | "`prediction'" == "" | "`probability'" == "" {
-        display as error "Target, prediction, and probability variables must be specified."
+    confirm variable `target'
+    confirm variable `prediction'
+    confirm variable `probability'
+    
+    if _rc {
+        display as error "One or more specified variables do not exist."
         exit 198
     }
     
@@ -55,9 +59,9 @@ program define evaluate_classification
     
     // Calculate Metrics
     local Accuracy = (`TP' + `TN') / (`TP' + `TN' + `FP' + `FN')
-    local Precision = `TP' / (`TP' + `FP')
-    local Recall = `TP' / (`TP' + `FN')
-    local F1_Score = 2 * (`Precision' * `Recall') / (`Precision' + `Recall')
+    local Precision = (`TP' + `FP') > 0 ? (`TP' / (`TP' + `FP')) : 0
+    local Recall = (`TP' + `FN') > 0 ? (`TP' / (`TP' + `FN')) : 0
+    local F1_Score = (`Precision' + `Recall') > 0 ? (2 * `Precision' * `Recall') / (`Precision' + `Recall') : 0
     
     // Calculate AUC
     roc `target' `probability'
